@@ -11,10 +11,10 @@ Par{5}=[400 10];%Generation runtime;  mutations per generation
 Par{6}=[0 1 2]; %allele spectrum
 Par{7}=[10 0];%rate of reading per competition; rate of image taking per generation - 0 means don't take
 for i=1:20
-Out{i}=RunGridModel(Par);
-disp(i);
-
+  Out{i}=RunGridModel(Par);
+  disp(i);
 end
+
 save('Run1','Par','Out')
 return
 
