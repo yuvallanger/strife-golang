@@ -7,7 +7,7 @@ R = 1-ceil(sprand(N,N,0.001));
 S = 1-ceil(sprand(N,N,0.001));%ones(N,N);%ceil(sprand(N,N,0.05))+1;
 Par{3}=R;
 Par{4}=S;
-Par{5}=[400 10];%Generation runtime;  mutations per generation
+Par{5}=[4 10];%Generation runtime;  mutations per generation
 Par{6}=[0 1 2]; %allele spectrum
 Par{7}=[10 0];%rate of reading per competition; rate of image taking per generation - 0 means don't take
 for i=1:20
@@ -18,14 +18,20 @@ end
 save('Run1','Par','Out')
 return
 
+function [varargout] = getelements(x)
+  nout = max(nargout,1);
+  for k=1:nout
+    varargout(k)={x(k)};
+  end
+end
 
 function out=RunGridModel(Par)
 %profile on
 
 [Mr,Ms,Mc,M0,r]=getelements(Par{1});
 [N,nh,fq]=getelements(Par{2});
-nhood=2*nh+1;
-nq=floor(fq*nhood.^2);
+nhood=2*nh+1; % ???
+nq=floor(fq*nhood.^2); % ???
 
 R=Par{3};
 S=Par{4};
@@ -181,29 +187,29 @@ return
 function [iw,jw,il,jl,cont]=competition(R,S,f)
 cont=0;
 N=size(R,1);
-dx=[-1 -1 0 1 1 1 0 -1];
-dy=[0 1 1 1 0 -1 -1 -1];
-while cont>-1
-v=ceil(rand(1,2)*N);
-i=v(1);
-j=v(2);
-in=ceil(rand(1)*8);
-i1=mod(i+dx(in)-1,N)+1;
-j1=mod(j+dy(in)-1,N)+1;
-if R(i,j)+10*S(i,j)~=R(i1,j1)+10*S(i1,j1)
-    if (f(i,j)+f(i1,j1))*rand(1)<f(i,j)
-        iw=i;
-        jw=j;
-        il=i1;
-        jl=j1;
+dx=[-1 -1  0  1  1  1  0 -1];
+dy=[ 0  1  1  1  0 -1 -1 -1];
+while cont > -1
+    v=ceil(rand(1,2)*N);
+    i=v(1);
+    j=v(2);
+    in=ceil(rand(1)*8);
+    i1=mod(i+dx(in)-1,N)+1;
+    j1=mod(j+dy(in)-1,N)+1;
+    if R(i,j)+10*S(i,j)~=R(i1,j1)+10*S(i1,j1)
+        if (f(i,j)+f(i1,j1))*rand(1)<f(i,j)
+            iw=i;
+            jw=j;
+            il=i1;
+            jl=j1;
+        else
+            iw=i1;
+            jw=j1;
+            il=i;
+            jl=j;
+        end   
+        break
     else
-        iw=i1;
-        jw=j1;
-        il=i;
-        jl=j;
-    end   
-    break
-else
-    cont=cont+1;
+        cont=cont+1;
 end
 end
