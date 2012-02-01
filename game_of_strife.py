@@ -10,8 +10,13 @@ def torusify(b, rl, rh, cl, ch):
     ci = arange(-cl, ch) % col_num
     return b[ri,:][:,ci]
 
-def diffuse(b):
-    
+def diffuse(b,c,direction):
+    row = (sp.array((0,0,1,1))+c[0])%b.shape[0]
+    col = (sp.array((0,1,0,1))+c[1])%b.shape[1]
+    if direction:
+        b[row,col] = b[row[[1,2,3,0]], col[[1,2,3,0]]]
+    else:
+        b[row,col] = b[row[[2,3,0,1]], col[[2,3,0,1]]]
 
 # Board size
 N = 20
@@ -59,7 +64,8 @@ while True:
         cl, ch = competitor_2[1], competitor_1[1]
     else:
         cl, ch = competitor_1[1], competitor_2[1]
-    S_sub = torify(S, rl-S_rad-R_rad, rh+S_rad+R_rad, cl-S_rad-R_rad, ch+S_rad+R_rad) # sub array of Signallers board
-    R_sub = torify(R, rl-R_rad, rh+S_rad, cl-R_rad, ch+R_rad)
+    S_sub = torusify(S, rl-S_rad-R_rad, rh+S_rad+R_rad, cl-S_rad-R_rad, ch+S_rad+R_rad) # sub array of Signallers board
+    R_sub = torusify(R, rl-R_rad, rh+S_rad, cl-R_rad, ch+R_rad)
     S_conv = sp.signal.convolve2d(S_nh, S_sum, mode='valid') # per cell signal available
     (R and S_conv < S_th)
+    tick += 1
