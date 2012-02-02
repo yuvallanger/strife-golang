@@ -6,8 +6,8 @@ def torusify(b, rl, rh, cl, ch):
     # rl, rh - row low, row high
     # cl, ch - col low, col high
     row_num, col_num = b.shape
-    ri = arange(-rl, rh) % row_num
-    ci = arange(-cl, ch) % col_num
+    ri = sp.arange(-rl, rh) % row_num
+    ci = sp.arange(-cl, ch) % col_num
     return b[ri,:][:,ci]
 
 def diffuse(b,c,direction):
@@ -18,43 +18,57 @@ def diffuse(b,c,direction):
     else:
         b[row,col] = b[row[[2,3,0,1]], col[[2,3,0,1]]]
 
+def competiroll(N):
+    # We'll use relative positions to compute exact positions of 2nd competitor cell
+    NEIGHBOUR_ROW = sp.array([-1,  0,  1, -1,  0,  1, -1,  1])
+    NEIGHBOUR_COL = sp.array([-1, -1, -1,  1,  1,  1,  0,  0])
+    NEIGHBOUR_REL_POS = sp.array(zip(NEIGHBOUR_ROW, NEIGHBOUR_COL))
+    c1 = sp.random.randint(N, size=2)
+    c2 = c1 + NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)][0]
+    return c1, c2
+
 # Board size
 N = 20
 
-# Signal
-S_rad = 3 # radius
-S_len = 2 * S_rad + 1 # one dimension's length
-S_nh = ones((S_len, S_len)) # the convolution matrix used to count signalling neighbours
+# radius
+S_rad = 3
+R_rad = 3
+C_rad = 3
 
-# Receptor
-R_th = 3 # quorum threshhold
+# diameter
+dia = lambda x: 2 * x + 1
+S_len = dia(S_rad)
+R_len = dia(R_rad)
+C_len = dia(C_rad)
+
+# the convolution matrix used to count neighbours
+S_counter = sp.ones((S_len, S_len))
+R_counter = sp.ones((R_len, R_len))
+C_counter = sp.ones((C_len, C_len)) # convolution matrix used to count cells that produce public goods
+
+# neighbours threshold
+R_th = 3 # quorum threshold
+C_th = 3 # Cooperation threshold. Above it, public goods makes a difference.
 
 # Cooperation
-C_rad = 3 # radius
-C_len = 2 * C_rad + 1 # one dimension's length
-C_nh = ones((C_len, C_len)) # convolution matrix used to count public goods producing cells
 C_th = 3 # threshhold of public goods effect
 
 # A cell can be Signalling and/or Receptive and/or Cooperative
-R = sp.rand(N, N) < 0.5
 S = sp.rand(N, N) < 0.5
+R = sp.rand(N, N) < 0.5
 C = sp.rand(N, N) < 0.5
-
-# We'll use relative positions to compute exact positions of 2nd competitor cell
-NEIGHBOUR_ROW = sp.array(2 * [-1, 0, 1] + [-1, 1])
-NEIGHBOUR_COL = sp.array(6 * [-1] + [0, 0])
-NEIGHBOUR_REL_POS = sp.array(zip(NEIGHBOUR_ROW, NEIGHBOUR_COL))
 
 tick = 0
 
 while True:
-    competitor_1 = sp.random.randint(N, size=2)
-    competitor_2 = competitor_1 + NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)]
-    while (R[competitor_1] == R[competitor_2] and
-           S[competitor_1] == S[competitor_2] and
-           C[competitor_1] == C[competitor_2]):
+    competitor_1, competitor_2 = competiroll(N)
+    print competitor_2
+    competitor_2t = competitor_2 % N
+    while ((R[competitor_1[0],competitor_1[1]] == R[competitor_2t[0], competitor_2t[1]]) and
+           (S[competitor_1[0],competitor_1[1]] == S[competitor_2t[0], competitor_2t[1]]) and
+           (C[competitor_1[0],competitor_1[1]] == C[competitor_2t[0], competitor_2t[1]])):
         competitor_1 = sp.random.randint(N, size=2)
-        competitor_2 = competitor_1 + NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)]
+        competitor_2 = competitor_1 + NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)][0]
         tick += 1
     if competitor_1[0] > competitor_2[0]:
         rl, rh = competitor_2[0], competitor_1[0]
@@ -64,8 +78,9 @@ while True:
         cl, ch = competitor_2[1], competitor_1[1]
     else:
         cl, ch = competitor_1[1], competitor_2[1]
-    S_sub = torusify(S, rl-S_rad-R_rad, rh+S_rad+R_rad, cl-S_rad-R_rad, ch+S_rad+R_rad) # sub array of Signallers board
-    R_sub = torusify(R, rl-R_rad, rh+S_rad, cl-R_rad, ch+R_rad)
-    S_conv = sp.signal.convolve2d(S_nh, S_sum, mode='valid') # per cell signal available
-    (R and S_conv < S_th)
+    S_sub = S[sp.arange(rl - S_rad - R_rad, rh + S_rad + R_rad)%N,:][:,sp.arange(cl - S_rad - R_rad, ch)%N] # sub array of Signallers board
+    R_sub = R[sp.arange(rl - R_rad, rh + R_rad)%N, :][:, sp.arange(cl - R_rad, ch + R_rad)%N]
+    S_conv = sp.signal.convolve2d(S_sub, sp.ones((3,3)), mode='valid') # per cell signal available
+    print S_conv.shape, S_sub.shape, R.shape
+    ((R == 1) and (S_conv < S_th))
     tick += 1
