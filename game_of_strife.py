@@ -3,8 +3,6 @@ import numpy as np
 import scipy.signal
 
 def torusify(b, rl, rh, cl, ch):
-    # rl, rh - row low, row high
-    # cl, ch - col low, col high
     row_num, col_num = b.shape
     ri = sp.arange(-rl, rh) % row_num
     ci = sp.arange(-cl, ch) % col_num
@@ -70,6 +68,8 @@ while True:
         competitor_1 = sp.random.randint(N, size=2)
         competitor_2 = competitor_1 + NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)][0]
         tick += 1
+    # rl, rh - row low, row high
+    # cl, ch - col low, col high
     if competitor_1[0] > competitor_2[0]:
         rl, rh = competitor_2[0], competitor_1[0]
     else:
