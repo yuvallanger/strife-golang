@@ -2,6 +2,8 @@ import scipy as sp
 import numpy as np
 import scipy.signal
 
+## functions
+
 def diffuse(b,c,direction):
     row = (sp.array((0,0,1,1))+c[0])%b.shape[0]
     col = (sp.array((0,1,0,1))+c[1])%b.shape[1]
@@ -11,25 +13,35 @@ def diffuse(b,c,direction):
         b[row,col] = b[row[[2,3,0,1]], col[[2,3,0,1]]]
 
 def competiroll(N):
+    """draw two competitor positions"""
     # We'll use relative positions to compute exact positions of 2nd competitor cell
     NEIGHBOUR_ROW = sp.array([-1,  0,  1, -1,  0,  1, -1,  1])
     NEIGHBOUR_COL = sp.array([-1, -1, -1,  1,  1,  1,  0,  0])
     NEIGHBOUR_REL_POS = sp.array(zip(NEIGHBOUR_ROW, NEIGHBOUR_COL))
     c1 = sp.random.randint(N, size=2)
-    c2 = c1 + NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)][0]
+    c2 = c1 + NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)[0]]
     return c1, c2
+
+## settings
 
 # Board size
 N = 20
+
+S_cost = 3
+R_cost = 8
+C_cost = 30
+
+# cooperation benefit, in ratio
+benefit = 0.3
 
 # radius
 S_rad = 1
 C_rad = 1
 
-# diameter
-dia = lambda x: 2 * x + 1
-S_len = dia(S_rad)
-C_len = dia(C_rad)
+# diameter of the convolution matrix
+diameter = lambda x: 2 * x + 1
+S_len = diameter(S_rad)
+C_len = diameter(C_rad)
 
 # the convolution matrix used to count neighbours
 S_counter = sp.ones((S_len, S_len))
@@ -47,36 +59,56 @@ C = sp.rand(N, N) < 0.5
 # we'll increase this by one every time two cells compete.
 tick = 0
 
+## main stuff
+
 while True:
     competitor_1, competitor_2 = competiroll(N)
     # competitor_2's coordinates in a torus
-    competitor_2t = competitor_2 % N 
+    competitor_2t = competitor_2 % N
     while ((R[competitor_1[0],competitor_1[1]] == R[competitor_2t[0], competitor_2t[1]]) and
            (S[competitor_1[0],competitor_1[1]] == S[competitor_2t[0], competitor_2t[1]]) and
            (C[competitor_1[0],competitor_1[1]] == C[competitor_2t[0], competitor_2t[1]])):
-        # we'll run this until we get a new 
+        # we'll run this until we get a pair of competitors that are actually different
         competitor_1, competitor_2 = competiroll(N)
         competitor_2t = competitor_2 % N
         tick += 1
     print "competitor_1, competitor_2"
     print competitor_1, competitor_2
-    # rl: row low; rh: row high
-    # cl: col low; ch: col high
+    # we figure out what are the low and high coordinates, so we may create a torusified copy of the competing cells' neighborhood.
+    # "rl" stands for "row low"; "rh" for "row high"
+    # "cl": "col low"; "ch": "col high"
     rl, rh = sp.sort((competitor_1[0], competitor_2[0]))
-    cl, ch = sp.sort((competitor_1[0], competitor_2[0]))
-    ## produce torusified versions of boards:
-    # sub array of Signallers board:
-    S_sub = S[sp.arange(rl - S_rad - C_rad, rh + S_rad + C_rad)%N,:][:,sp.arange(cl - S_rad - C_rad, ch + S_rad + C_rad)%N]
-    R_sub = R[sp.arange(rl - C_rad, rh + C_rad)%N, :][:, sp.arange(cl - C_rad, ch + C_rad)%N]
-    C_sub = C[sp.arange(rl - C_rad, rh + C_rad)%N, :][:, sp.arange(cl - C_rad, ch + C_rad)%N]
+    cl, ch = sp.sort((competitor_1[1], competitor_2[1]))
+    # here we produce torusified versions of the competing cells' neighborhood.
+    # for signallers, we take both S_rad and C_rad around our competitors because,
+    # signallers affect receptive && cooperating cells which affect our competitors
+    S_sub = S[sp.arange(rl - S_rad - C_rad, rh + S_rad + C_rad + 1)%N,:][:,sp.arange(cl - S_rad - C_rad, ch + S_rad + C_rad + 1)%N]
+    R_sub = R[sp.arange(rl - C_rad, rh + C_rad + 1)%N, :][:, sp.arange(cl - C_rad, ch + C_rad + 1)%N]
+    C_sub = C[sp.arange(rl - C_rad, rh + C_rad + 1)%N, :][:, sp.arange(cl - C_rad, ch + C_rad + 1)%N]
+    print "rl, rh, cl, ch",
+    print rl, rh, cl, ch
+    print "rl - S_rad - C_rad, rh + S_rad + C_rad, cl - S_rad - C_rad, ch + S_rad + C_rad"
+    print rl - S_rad - C_rad, rh + S_rad + C_rad, cl - S_rad - C_rad, ch + S_rad + C_rad
     print "S_sub.shape, R_sub.shape, C_sub.shape"
     print S_sub.shape, R_sub.shape, C_sub.shape
-    # per cell signal available
-    S_conv = sp.signal.convolve2d(S_sub, S_counter, mode='valid')  
-    cooping_nh = (C_sub == R_sub) == (S_conv > S_th)
+    # we count how many signallers are within each cell's neighbourhood
+    S_conv = sp.signal.convolve2d(S_sub, S_counter, mode='valid')
+    # a cell will produce common goods if it's receptive and cooperative and signal in its neighborhood is above threshold
+    cooping_cells = (C_sub == R_sub) == (S_conv > S_th)
     # how many cooperators around each competitor?
-    print "cooping_nh"
-    print cooping_nh.shape
-    print cooping_nh
-    C_conv = sp.signal.convolve2d(cooping_nh, C_counter, mode='valid')
+    print "cooping_cells"
+    print cooping_cells.shape
+    print cooping_cells
+    C_conv = sp.signal.convolve2d(cooping_cells, C_counter, mode='valid')
+    # Public goods effect.
+    # G for Goods
+    G = (C_conv > C_th)
+    # F for Fitness
+    print "G.shape", G.shape
+    F = (G * (S_cost * S[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
+              R_cost * R[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
+              C_cost * C[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]]) +
+         (G^True) *  (1 - benefit) * (S_cost * S[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
+              R_cost * R[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
+              C_cost * C[[N * competitor_1[0] + competitor_1[1], N * (competitor_2t[0]) + (competitor_2t[1])]]))
     tick += 1
