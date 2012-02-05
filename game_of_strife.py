@@ -58,21 +58,25 @@ while True:
         competitor_1, competitor_2 = competiroll(N)
         competitor_2t = competitor_2 % N
         tick += 1
+    print "competitor_1, competitor_2"
+    print competitor_1, competitor_2
     # rl: row low; rh: row high
     # cl: col low; ch: col high
-    if competitor_1[0] > competitor_2[0]:
-        rl, rh = competitor_2[0], competitor_1[0]
-    else:
-        rl, rh = competitor_1[0], competitor_2[0]
-    if competitor_1[1] > competitor_2[1]:
-        cl, ch = competitor_2[1], competitor_1[1]
-    else:
-        cl, ch = competitor_1[1], competitor_2[1]
-    # produce torusified versions of boards:
-    S_sub = S[sp.arange(rl - S_rad - C_rad, rh + S_rad + C_rad)%N,:][:,sp.arange(cl - S_rad - C_rad, ch + S_rad + C_rad)%N] # sub array of Signallers board
+    rl, rh = sp.sort((competitor_1[0], competitor_2[0]))
+    cl, ch = sp.sort((competitor_1[0], competitor_2[0]))
+    ## produce torusified versions of boards:
+    # sub array of Signallers board:
+    S_sub = S[sp.arange(rl - S_rad - C_rad, rh + S_rad + C_rad)%N,:][:,sp.arange(cl - S_rad - C_rad, ch + S_rad + C_rad)%N]
     R_sub = R[sp.arange(rl - C_rad, rh + C_rad)%N, :][:, sp.arange(cl - C_rad, ch + C_rad)%N]
     C_sub = C[sp.arange(rl - C_rad, rh + C_rad)%N, :][:, sp.arange(cl - C_rad, ch + C_rad)%N]
-    print S_sub, '\n', S_sub.shape, '\n', S_counter, '\n', S_counter.shape
-    S_conv = sp.signal.convolve2d(S_sub, S_counter, mode='valid') # per cell signal available
-    print (C_sub == R_sub) == (S_conv > S_th)
+    print "S_sub.shape, R_sub.shape, C_sub.shape"
+    print S_sub.shape, R_sub.shape, C_sub.shape
+    # per cell signal available
+    S_conv = sp.signal.convolve2d(S_sub, S_counter, mode='valid')  
+    cooping_nh = (C_sub == R_sub) == (S_conv > S_th)
+    # how many cooperators around each competitor?
+    print "cooping_nh"
+    print cooping_nh.shape
+    print cooping_nh
+    C_conv = sp.signal.convolve2d(cooping_nh, C_counter, mode='valid')
     tick += 1
