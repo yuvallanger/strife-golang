@@ -47,7 +47,7 @@ C_len = diameter(C_rad)
 S_counter = sp.ones((S_len, S_len))
 C_counter = sp.ones((C_len, C_len)) # convolution matrix used to count cells that produce public goods
 
-# neighbours threshold
+# neighbours effects' thresholds
 S_th = 3 # quorum threshold
 C_th = 3 # Cooperation threshold. Above it, public goods makes a difference.
 
@@ -61,16 +61,20 @@ tick = 0
 
 ## main stuff
 
+while_count = 0
+
 while True:
+    print "while_count", while_count
     competitor_1, competitor_2 = competiroll(N)
-    # competitor_2's coordinates in a torus
+    # competitor_2's coordinates in a torus:
     competitor_2t = competitor_2 % N
+    # we'll run this until we get a pair of competitors that are actually different:
     while ((R[competitor_1[0],competitor_1[1]] == R[competitor_2t[0], competitor_2t[1]]) and
            (S[competitor_1[0],competitor_1[1]] == S[competitor_2t[0], competitor_2t[1]]) and
            (C[competitor_1[0],competitor_1[1]] == C[competitor_2t[0], competitor_2t[1]])):
-        # we'll run this until we get a pair of competitors that are actually different
         competitor_1, competitor_2 = competiroll(N)
         competitor_2t = competitor_2 % N
+        # time passes:
         tick += 1
     print "competitor_1, competitor_2"
     print competitor_1, competitor_2
@@ -103,12 +107,26 @@ while True:
     # Public goods effect.
     # G for Goods
     G = (C_conv > C_th)
-    # F for Fitness
+    
     print "G.shape", G.shape
-    F = (G * (S_cost * S[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
-              R_cost * R[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
-              C_cost * C[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]]) +
-         (G^True) *  (1 - benefit) * (S_cost * S[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
-              R_cost * R[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
-              C_cost * C[[N * competitor_1[0] + competitor_1[1], N * (competitor_2t[0]) + (competitor_2t[1])]]))
+    # all cells for which the effect of goods is above threshold is True in G.
+    # M for Metabolism
+    if competitor_1[0] < competitor_2[0] and competitor_1[1] < competitor_2[1]:
+        S_pair[competitor_1[0]:competitor_2[0]+1, competitor
+    elif competitor_1[0] == competitor_2[0] and competitor_1[1] < competitor_2[1]:
+    elif competitor_1[0] > competitor_2[0] and competitor_1[1] < competitor_2[1]:
+    elif competitor_1[0] < competitor_2[0] and competitor_1[1] == competitor_2[1]:
+    elif competitor_1[0] == competitor_2[0] and competitor_1[1] == competitor_2[1]:
+    elif competitor_1[0] > competitor_2[0] and competitor_1[1] == competitor_2[1]:
+    elif competitor_1[0] < competitor_2[0] and competitor_1[1] > competitor_2[1]:
+    elif competitor_1[0] == competitor_2[0] and competitor_1[1] > competitor_2[1]:
+    elif competitor_1[0] > competitor_2[0] and competitor_1[1] > competitor_2[1]:
+    M = G * (1 - benefit) * (S_cost * S[tuple(set((competitor_1[0], + competitor_2t[0]))), :]N * competitor_2t[0] + competitor_2t[1]]] +
+                             R_cost * R[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
+                             C_cost * C[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]])
+    # all false in G don't benefit from public goods (G^True flips values)
+    M += (G^True) *  (S_cost * S[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
+                      R_cost * R[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
+                      C_cost * C[[N * competitor_1[0] + competitor_1[1], N * (competitor_2t[0]) + (competitor_2t[1])]])
     tick += 1
+    while_count += 1
