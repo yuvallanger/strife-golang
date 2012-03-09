@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import scipy as sp
 import numpy as np
 import scipy.signal
@@ -19,8 +21,9 @@ def competiroll(N):
     NEIGHBOUR_COL = sp.array([-1, -1, -1,  1,  1,  1,  0,  0])
     NEIGHBOUR_REL_POS = sp.array(zip(NEIGHBOUR_ROW, NEIGHBOUR_COL))
     c1 = sp.random.randint(N, size=2)
-    c2 = c1 + NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)[0]]
-    return c1, c2
+    deltas = NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)[0]]
+    c2 = c1 + deltas
+    return c1, c2, deltas
 
 ## settings
 
