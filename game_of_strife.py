@@ -2,14 +2,10 @@ import sys
 import scipy as sp
 import numpy as np
 import scipy.signal
-import matplotlib
-import matplotlib.pyplot
-from PySide import QtCore, QtGui
-import Image
+import pygame
 
 ## globals
 
-# Board size
 global N, S_cost, R_cost, benefit, S_rad, C_rad, S_len, C_len, S_counter, C_counter, S_th, C_th, S, R, C, tick
 
 ## functions
