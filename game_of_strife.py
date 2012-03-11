@@ -1,9 +1,16 @@
+import sys
 import scipy as sp
 import numpy as np
 import scipy.signal
 import matplotlib
 import matplotlib.pyplot
-import time
+from PySide import QtCore, QtGui
+import Image
+
+## globals
+
+# Board size
+global N, S_cost, R_cost, benefit, S_rad, C_rad, S_len, C_len, S_counter, C_counter, S_th, C_th, S, R, C, tick
 
 ## functions
 
@@ -24,6 +31,7 @@ def competiroll(N):
     c1 = sp.random.randint(N, size=2)
     c2 = c1 + NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)[0]]
     return c1, c2
+
 
 ## settings
 
@@ -62,15 +70,20 @@ C = sp.rand(N, N) < 0.5
 # we'll increase this by one every time two cells compete.
 tick = 0
 
+## QtSide stuff
+
+app = QtGui.QApplication([])
+
+data = np.random.random( (N, N ,3))
+imagify_data()
+
 ## main stuff
 
 while_count = 0
 
-matplotlib.pyplot.ion()
-mats=matplotlib.pyplot.matshow(S+R*2+C*3)
-
-while True:
+def mainstuff():
     print "while_count", while_count
+    ## compete
     competitor_1, competitor_2 = competiroll(N)
     # competitor_2's coordinates in a torus:
     competitor_2t = competitor_2 % N
@@ -122,7 +135,35 @@ while True:
         S[competitor_2t[0], competitor_2t[1]] = S[competitor_1[0], competitor_1[1]]
         R[competitor_2t[0], competitor_2t[1]] = R[competitor_1[0], competitor_1[1]]
     mats.set_data(S+R*2+C*3)
+    matplotlib.pyplot.ion()
     matplotlib.pyplot.show()
-    raw_input()
+    matplotlib.pyplot.ioff()
+    ## mutate
+    if sp.random.random()>0.1:
+        coords = sp.random.randint(N, size=2)
+        B = [C, R, S][sp.random.randint(3)]
+        B[coords[0], coords[1]] = sp.random.randint(2)
+    data = 3*C + 2*R + S
     tick += 1
     while_count += 1
+
+## process data
+
+def imagify_data():
+    img = Image.fromarray(data, 'RGB')
+    img = img.resize((500,500))
+    imgstr_data = img.tostring()
+    image = QtGui.QImage(imgstr_data, N, N, QtGui.QImage.Format_ARGB32)
+    pix = QtGui.QPixmap.fromImage(image)
+    lbl = QtGui.QLabel()
+    lbl.setPixmap(pix)
+    lbl.show()
+
+## update display
+
+def update_display():
+    return None
+
+## QtSide main loop
+
+app.exec_()
