@@ -6,7 +6,7 @@ import pygame
 
 ## globals
 
-global N, S_cost, R_cost, benefit, S_rad, C_rad, S_len, C_len, S_counter, C_counter, S_th, C_th, S, R, C, tick
+#global N, S_cost, R_cost, benefit, S_rad, C_rad, S_len, C_len, S_counter, C_counter, S_th, C_th, S, R, C, tick, image, data, while_count
 
 ## functions
 
@@ -66,19 +66,19 @@ C = sp.rand(N, N) < 0.5
 # we'll increase this by one every time two cells compete.
 tick = 0
 
-## QtSide stuff
-
-app = QtGui.QApplication([])
-
-data = np.random.random( (N, N ,3))
-imagify_data()
-
 ## main stuff
 
-while_count = 0
+# pygame initialization
+
+pygame.init()
+screen = pygame.display.set_mode((640,800))
+pygame.display.set_caption("lets see")
+
+
 
 def mainstuff():
-    print "while_count", while_count
+    global while_count, tick, data
+    #print "while_count", while_count
     ## compete
     competitor_1, competitor_2 = competiroll(N)
     # competitor_2's coordinates in a torus:
@@ -130,10 +130,6 @@ def mainstuff():
         C[competitor_2t[0], competitor_2t[1]] = C[competitor_1[0], competitor_1[1]]
         S[competitor_2t[0], competitor_2t[1]] = S[competitor_1[0], competitor_1[1]]
         R[competitor_2t[0], competitor_2t[1]] = R[competitor_1[0], competitor_1[1]]
-    mats.set_data(S+R*2+C*3)
-    matplotlib.pyplot.ion()
-    matplotlib.pyplot.show()
-    matplotlib.pyplot.ioff()
     ## mutate
     if sp.random.random()>0.1:
         coords = sp.random.randint(N, size=2)
@@ -146,20 +142,25 @@ def mainstuff():
 ## process data
 
 def imagify_data():
-    img = Image.fromarray(data, 'RGB')
-    img = img.resize((500,500))
-    imgstr_data = img.tostring()
-    image = QtGui.QImage(imgstr_data, N, N, QtGui.QImage.Format_ARGB32)
-    pix = QtGui.QPixmap.fromImage(image)
-    lbl = QtGui.QLabel()
-    lbl.setPixmap(pix)
-    lbl.show()
+    global image
+    resized_data = data.repeat(4, axis=0).repeat(4, axis=1)
+    image = pygame.surfarray.make_surface(resized_data)
 
 ## update display
 
 def update_display():
-    return None
+    global image
+    screen.blit(image, (0, 0))
+    pygame.display.flip()
 
-## QtSide main loop
+clock = pygame.time.Clock()
 
-app.exec_()
+# infinite loop
+
+while_count = 0
+
+while True:
+    mainstuff()
+    imagify_data()
+    update_display()
+    clock.tick(60)
