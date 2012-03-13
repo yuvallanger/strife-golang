@@ -1,8 +1,14 @@
-#!/usr/bin/python
-
+import sys
 import scipy as sp
 import numpy as np
 import scipy.signal
+import pygame
+
+# TODO: How do I figure out what's the wanted frequency of mutation and diffusion?
+
+## globals
+
+#global N, S_cost, R_cost, benefit, S_rad, C_rad, S_len, C_len, S_counter, C_counter, S_th, C_th, S, R, C, tick, image, data, while_count
 
 ## functions
 
@@ -21,14 +27,14 @@ def competiroll(N):
     NEIGHBOUR_COL = sp.array([-1, -1, -1,  1,  1,  1,  0,  0])
     NEIGHBOUR_REL_POS = sp.array(zip(NEIGHBOUR_ROW, NEIGHBOUR_COL))
     c1 = sp.random.randint(N, size=2)
-    deltas = NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)[0]]
-    c2 = c1 + deltas
-    return c1, c2, deltas
+    c2 = c1 + NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)[0]]
+    return c1, c2
+
 
 ## settings
 
 # Board size
-N = 20
+N = 50
 
 S_cost = 3
 R_cost = 8
@@ -64,10 +70,27 @@ tick = 0
 
 ## main stuff
 
-while_count = 0
+# pygame initialization
 
-while True:
-    print "while_count", while_count
+pygame.init()
+screen = pygame.display.set_mode((N*4, N*4))
+pygame.display.set_caption("lets see")
+
+def diffuse():
+    m, n = sp.random.randint(N, size=2)
+    m1, n1 = (m+1)%N, (n+1)%N
+    if sp.random.randint(2):
+        # Truth for clockwise
+        for board in [R, S, C]:
+            board[[m, m, m1, m1], [n, n1, n1, n]] = board[[m1, m, m, m1], [n, n, n1, n1]]
+    else:
+        for board in [R, S, C]:
+            board[[m, m, m1, m1], [n, n1, n1, n]] = board[[m, m1, m1, m], [n1, n1, n, n]]
+
+def mainstuff():
+    global while_count, tick, data
+    #print "while_count", while_count
+    ## compete
     competitor_1, competitor_2 = competiroll(N)
     # competitor_2's coordinates in a torus:
     competitor_2t = competitor_2 % N
@@ -81,21 +104,12 @@ while True:
         tick += 1
     print "competitor_1, competitor_2"
     print competitor_1, competitor_2
-    # we figure out what are the low and high coordinates, so we may create a torusified copy of the competing cells' neighborhood.
-    # "rl" stands for "row low"; "rh" for "row high"
-    # "cl": "col low"; "ch": "col high"
-    rl, rh = sp.sort((competitor_1[0], competitor_2[0]))
-    cl, ch = sp.sort((competitor_1[1], competitor_2[1]))
-    # here we produce torusified versions of the competing cells' neighborhood.
+    # here we produce torusified versions of the boards.
     # for signallers, we take both S_rad and C_rad around our competitors because,
     # signallers affect receptive && cooperating cells which affect our competitors
-    S_sub = S[sp.arange(rl - S_rad - C_rad, rh + S_rad + C_rad + 1)%N,:][:,sp.arange(cl - S_rad - C_rad, ch + S_rad + C_rad + 1)%N]
-    R_sub = R[sp.arange(rl - C_rad, rh + C_rad + 1)%N, :][:, sp.arange(cl - C_rad, ch + C_rad + 1)%N]
-    C_sub = C[sp.arange(rl - C_rad, rh + C_rad + 1)%N, :][:, sp.arange(cl - C_rad, ch + C_rad + 1)%N]
-    print "rl, rh, cl, ch",
-    print rl, rh, cl, ch
-    print "rl - S_rad - C_rad, rh + S_rad + C_rad, cl - S_rad - C_rad, ch + S_rad + C_rad"
-    print rl - S_rad - C_rad, rh + S_rad + C_rad, cl - S_rad - C_rad, ch + S_rad + C_rad
+    S_sub = S[sp.arange(- S_rad - C_rad, S_rad + C_rad + 1)%N,:][:, sp.arange(- S_rad - C_rad, S_rad + C_rad + 1)%N]
+    R_sub = R[sp.arange(- C_rad, C_rad + 1)%N, :][:, sp.arange(- C_rad, C_rad + 1)%N]
+    C_sub = C[sp.arange(- C_rad, C_rad + 1)%N, :][:, sp.arange(- C_rad, C_rad + 1)%N]
     print "S_sub.shape, R_sub.shape, C_sub.shape"
     print S_sub.shape, R_sub.shape, C_sub.shape
     # we count how many signallers are within each cell's neighbourhood
@@ -110,26 +124,56 @@ while True:
     # Public goods effect.
     # G for Goods
     G = (C_conv > C_th)
-    
     print "G.shape", G.shape
     # all cells for which the effect of goods is above threshold is True in G.
     # M for Metabolism
-    if competitor_1[0] < competitor_2[0] and competitor_1[1] < competitor_2[1]:
-        S_pair[competitor_1[0]:competitor_2[0]+1, competitor
-    elif competitor_1[0] == competitor_2[0] and competitor_1[1] < competitor_2[1]:
-    elif competitor_1[0] > competitor_2[0] and competitor_1[1] < competitor_2[1]:
-    elif competitor_1[0] < competitor_2[0] and competitor_1[1] == competitor_2[1]:
-    elif competitor_1[0] == competitor_2[0] and competitor_1[1] == competitor_2[1]:
-    elif competitor_1[0] > competitor_2[0] and competitor_1[1] == competitor_2[1]:
-    elif competitor_1[0] < competitor_2[0] and competitor_1[1] > competitor_2[1]:
-    elif competitor_1[0] == competitor_2[0] and competitor_1[1] > competitor_2[1]:
-    elif competitor_1[0] > competitor_2[0] and competitor_1[1] > competitor_2[1]:
-    M = G * (1 - benefit) * (S_cost * S[tuple(set((competitor_1[0], + competitor_2t[0]))), :]N * competitor_2t[0] + competitor_2t[1]]] +
-                             R_cost * R[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
-                             C_cost * C[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]])
+    cost_board = S_cost * S + R_cost * R + C_cost * C
+    M = G * (1 - benefit) * cost_board
     # all false in G don't benefit from public goods (G^True flips values)
-    M += (G^True) *  (S_cost * S[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
-                      R_cost * R[[N * competitor_1[0] + competitor_1[1], N * competitor_2t[0] + competitor_2t[1]]] +
-                      C_cost * C[[N * competitor_1[0] + competitor_1[1], N * (competitor_2t[0]) + (competitor_2t[1])]])
+    M += (G^True) *  cost_board
+    if M[competitor_1[0], competitor_1[1]] > M[competitor_2t[0], competitor_2t[1]]:
+        C[competitor_1[0], competitor_1[1]] = C[competitor_2t[0], competitor_2t[1]]
+        S[competitor_1[0], competitor_1[1]] = S[competitor_2t[0], competitor_2t[1]]
+        R[competitor_1[0], competitor_1[1]] = R[competitor_2t[0], competitor_2t[1]]
+    elif M[competitor_1[0], competitor_1[1]] == M[competitor_2t[0], competitor_2t[1]]:
+        print 'buga'
+    else:
+        C[competitor_2t[0], competitor_2t[1]] = C[competitor_1[0], competitor_1[1]]
+        S[competitor_2t[0], competitor_2t[1]] = S[competitor_1[0], competitor_1[1]]
+        R[competitor_2t[0], competitor_2t[1]] = R[competitor_1[0], competitor_1[1]]
+    ## mutate
+    if sp.random.random()>0.1:
+        coords = sp.random.randint(N, size=2)
+        B = [C, R, S][sp.random.randint(3)]
+        B[coords[0], coords[1]] = sp.random.randint(2)
+    ## diffuse
+    diffuse()
+    ## package data
+    data = 3*C + 2*R + S
     tick += 1
     while_count += 1
+
+## process data
+
+def imagify_data():
+    global image
+    resized_data = data.repeat(4, axis=0).repeat(4, axis=1)
+    image = pygame.surfarray.make_surface(resized_data)
+
+## update display
+
+def update_display():
+    global image
+    screen.blit(image, (0, 0))
+    pygame.display.flip()
+
+clock = pygame.time.Clock()
+
+# infinite loop
+
+while_count = 0
+
+while True:
+    mainstuff()
+    imagify_data()
+    update_display()
