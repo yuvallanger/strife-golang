@@ -1,3 +1,5 @@
+## A model by Dr. Avigdor Eldar based on 
+
 import sys
 import scipy as sp
 import numpy as np
@@ -11,14 +13,6 @@ import pygame
 #global N, S_cost, R_cost, benefit, S_rad, C_rad, S_len, C_len, S_counter, C_counter, S_th, C_th, S, R, C, tick, image, data, while_count
 
 ## functions
-
-def diffuse(b,c,direction):
-    row = (sp.array((0,0,1,1))+c[0])%b.shape[0]
-    col = (sp.array((0,1,0,1))+c[1])%b.shape[1]
-    if direction:
-        b[row,col] = b[row[[1,2,3,0]], col[[1,2,3,0]]]
-    else:
-        b[row,col] = b[row[[2,3,0,1]], col[[2,3,0,1]]]
 
 def competiroll(N):
     """draw two competitor positions"""
@@ -149,7 +143,11 @@ def mainstuff():
     ## diffuse
     diffuse()
     ## package data
-    data = 3*C + 2*R + S
+    data = sp.ndarray(shape=[N,N,3])
+    data[:,:,0] = S
+    data[:,:,1] = R
+    data[:,:,2] = C
+    data = 255*data
     tick += 1
     while_count += 1
 
