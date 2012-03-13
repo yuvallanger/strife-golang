@@ -4,6 +4,8 @@ import numpy as np
 import scipy.signal
 import pygame
 
+# TODO: How do I figure out what's the wanted frequency of mutation and diffusion?
+
 ## globals
 
 #global N, S_cost, R_cost, benefit, S_rad, C_rad, S_len, C_len, S_counter, C_counter, S_th, C_th, S, R, C, tick, image, data, while_count
@@ -32,7 +34,7 @@ def competiroll(N):
 ## settings
 
 # Board size
-N = 20
+N = 50
 
 S_cost = 3
 R_cost = 8
@@ -71,10 +73,19 @@ tick = 0
 # pygame initialization
 
 pygame.init()
-screen = pygame.display.set_mode((640,800))
+screen = pygame.display.set_mode((N*4, N*4))
 pygame.display.set_caption("lets see")
 
-
+def diffuse():
+    m, n = sp.random.randint(N, size=2)
+    m1, n1 = (m+1)%N, (n+1)%N
+    if sp.random.randint(2):
+        # Truth for clockwise
+        for board in [R, S, C]:
+            board[[m, m, m1, m1], [n, n1, n1, n]] = board[[m1, m, m, m1], [n, n, n1, n1]]
+    else:
+        for board in [R, S, C]:
+            board[[m, m, m1, m1], [n, n1, n1, n]] = board[[m, m1, m1, m], [n1, n1, n, n]]
 
 def mainstuff():
     global while_count, tick, data
@@ -135,6 +146,9 @@ def mainstuff():
         coords = sp.random.randint(N, size=2)
         B = [C, R, S][sp.random.randint(3)]
         B[coords[0], coords[1]] = sp.random.randint(2)
+    ## diffuse
+    diffuse()
+    ## package data
     data = 3*C + 2*R + S
     tick += 1
     while_count += 1
