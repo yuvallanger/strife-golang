@@ -5,11 +5,7 @@ import scipy.signal
 import pygame
 
 # TODO: How do I figure out what's the wanted frequency of mutation and diffusion?
-
-## globals
 # TODO: Where exactly do I "global foo"? In which scopes and namespaces does "foo" lives?
-
-#global N, S_cost, R_cost, benefit, S_rad, C_rad, S_len, C_len, S_counter, C_counter, S_th, C_th, S, R, C, tick, image, data, while_count
 
 ## functions
 
