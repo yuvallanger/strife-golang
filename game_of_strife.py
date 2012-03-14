@@ -1,14 +1,13 @@
 ## A model by Dr. Avigdor Eldar based on 
 
-import sys
 import scipy as sp
-import numpy as np
 import scipy.signal
 import pygame
 
 # TODO: How do I figure out what's the wanted frequency of mutation and diffusion?
 
 ## globals
+# TODO: Where exactly do I "global foo"? In which scopes and namespaces does "foo" lives?
 
 #global N, S_cost, R_cost, benefit, S_rad, C_rad, S_len, C_len, S_counter, C_counter, S_th, C_th, S, R, C, tick, image, data, while_count
 
@@ -70,6 +69,13 @@ pygame.init()
 screen = pygame.display.set_mode((N*4, N*4))
 pygame.display.set_caption("lets see")
 
+def mutate():
+    global C, R, S
+    if sp.random.random()>0.1:
+        coords = sp.random.randint(N, size=2)
+        B = [C, R, S][sp.random.randint(3)]
+        B[coords[0], coords[1]] = sp.random.randint(2)
+
 def diffuse():
     m, n = sp.random.randint(N, size=2)
     m1, n1 = (m+1)%N, (n+1)%N
@@ -89,9 +95,9 @@ def mainstuff():
     # competitor_2's coordinates in a torus:
     competitor_2t = competitor_2 % N
     # we'll run this until we get a pair of competitors that are actually different:
-    while ((R[competitor_1[0],competitor_1[1]] == R[competitor_2t[0], competitor_2t[1]]) and
-           (S[competitor_1[0],competitor_1[1]] == S[competitor_2t[0], competitor_2t[1]]) and
-           (C[competitor_1[0],competitor_1[1]] == C[competitor_2t[0], competitor_2t[1]])):
+    while ((R[competitor_1[0], competitor_1[1]] == R[competitor_2t[0], competitor_2t[1]]) and
+           (S[competitor_1[0], competitor_1[1]] == S[competitor_2t[0], competitor_2t[1]]) and
+           (C[competitor_1[0], competitor_1[1]] == C[competitor_2t[0], competitor_2t[1]])):
         competitor_1, competitor_2 = competiroll(N)
         competitor_2t = competitor_2 % N
         # time passes:
@@ -101,7 +107,7 @@ def mainstuff():
     # here we produce torusified versions of the boards.
     # for signallers, we take both S_rad and C_rad around our competitors because,
     # signallers affect receptive && cooperating cells which affect our competitors
-    S_sub = S[sp.arange(- S_rad - C_rad, S_rad + C_rad + 1)%N,:][:, sp.arange(- S_rad - C_rad, S_rad + C_rad + 1)%N]
+    S_sub = S[sp.arange(- S_rad - C_rad, S_rad + C_rad + 1)%N, :][:, sp.arange(- S_rad - C_rad, S_rad + C_rad + 1)%N]
     R_sub = R[sp.arange(- C_rad, C_rad + 1)%N, :][:, sp.arange(- C_rad, C_rad + 1)%N]
     C_sub = C[sp.arange(- C_rad, C_rad + 1)%N, :][:, sp.arange(- C_rad, C_rad + 1)%N]
     print "S_sub.shape, R_sub.shape, C_sub.shape"
@@ -135,26 +141,21 @@ def mainstuff():
         C[competitor_2t[0], competitor_2t[1]] = C[competitor_1[0], competitor_1[1]]
         S[competitor_2t[0], competitor_2t[1]] = S[competitor_1[0], competitor_1[1]]
         R[competitor_2t[0], competitor_2t[1]] = R[competitor_1[0], competitor_1[1]]
-    ## mutate
-    if sp.random.random()>0.1:
-        coords = sp.random.randint(N, size=2)
-        B = [C, R, S][sp.random.randint(3)]
-        B[coords[0], coords[1]] = sp.random.randint(2)
     ## diffuse
     diffuse()
-    ## package data
-    data = sp.ndarray(shape=[N,N,3])
-    data[:,:,0] = S
-    data[:,:,1] = R
-    data[:,:,2] = C
-    data = 255*data
     tick += 1
     while_count += 1
 
 ## process data
 
 def imagify_data():
-    global image
+    global image, S, R, C
+    ## package data
+    data = sp.ndarray(shape=[N, N, 3])
+    data[:, :, 0] = S
+    data[:, :, 1] = R
+    data[:, :, 2] = C
+    data = 255*data
     resized_data = data.repeat(4, axis=0).repeat(4, axis=1)
     image = pygame.surfarray.make_surface(resized_data)
 
@@ -172,6 +173,6 @@ clock = pygame.time.Clock()
 while_count = 0
 
 while True:
-    mainstuff()
+    mainstuff() # the main algorithm
     imagify_data()
     update_display()
