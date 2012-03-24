@@ -65,27 +65,8 @@ pygame.init()
 screen = pygame.display.set_mode((N*4, N*4))
 pygame.display.set_caption("lets see")
 
-def mutate():
-    global C, R, S
-    if sp.random.random()>0.1:
-        coords = sp.random.randint(N, size=2)
-        B = [C, R, S][sp.random.randint(3)]
-        B[coords[0], coords[1]] = sp.random.randint(2)
-
-def diffuse():
-    m, n = sp.random.randint(N, size=2)
-    m1, n1 = (m+1)%N, (n+1)%N
-    if sp.random.randint(2):
-        # Truth for clockwise
-        for board in [R, S, C]:
-            board[[m, m, m1, m1], [n, n1, n1, n]] = board[[m1, m, m, m1], [n, n, n1, n1]]
-    else:
-        for board in [R, S, C]:
-            board[[m, m, m1, m1], [n, n1, n1, n]] = board[[m, m1, m1, m], [n1, n1, n, n]]
-
-def mainstuff():
-    global while_count, tick, data
-    #print "while_count", while_count
+def competition():
+    global C, R, S, tick
     ## compete
     competitor_1, competitor_2 = competiroll(N)
     # competitor_2's coordinates in a torus:
@@ -136,8 +117,30 @@ def mainstuff():
     else:
         C[competitor_2t[0], competitor_2t[1]] = C[competitor_1[0], competitor_1[1]]
         S[competitor_2t[0], competitor_2t[1]] = S[competitor_1[0], competitor_1[1]]
-        R[competitor_2t[0], competitor_2t[1]] = R[competitor_1[0], competitor_1[1]]
-    ## diffuse
+        R[competitor_2t[0], competitor_2t[1]] = R[competitor_1[0], competitor_1[1]]    
+
+def mutate():
+    global C, R, S
+    if sp.random.random()>0.1:
+        coords = sp.random.randint(N, size=2)
+        B = [C, R, S][sp.random.randint(3)]
+        B[coords[0], coords[1]] = sp.random.randint(2)
+
+def diffuse():
+    m, n = sp.random.randint(N, size=2)
+    m1, n1 = (m+1)%N, (n+1)%N
+    if sp.random.randint(2):
+        # Truth for clockwise
+        for board in [R, S, C]:
+            board[[m, m, m1, m1], [n, n1, n1, n]] = board[[m1, m, m, m1], [n, n, n1, n1]]
+    else:
+        for board in [R, S, C]:
+            board[[m, m, m1, m1], [n, n1, n1, n]] = board[[m, m1, m1, m], [n1, n1, n, n]]
+
+def mainstuff():
+    global while_count, tick, data
+    #print "while_count", while_count
+    competition()
     diffuse()
     tick += 1
     while_count += 1
@@ -151,8 +154,7 @@ def imagify_data():
     data[:, :, 0] = S
     data[:, :, 1] = R
     data[:, :, 2] = C
-    data = 255*data
-    resized_data = data.repeat(4, axis=0).repeat(4, axis=1)
+    resized_data = (255*data).repeat(4, axis=0).repeat(4, axis=1)
     image = pygame.surfarray.make_surface(resized_data)
 
 ## update display
