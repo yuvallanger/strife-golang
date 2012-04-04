@@ -24,6 +24,23 @@ def competiroll(N):
 
 # Board size
 N = 50
+cell_num = N**2
+
+## time keeping
+# number of generations the simulation will run
+# each generation is defined as the average number of steps for which each cell
+# on the board was in a competition once since last generation (?)
+
+# we'll increase this by one every time two cells compete.
+step = 0
+
+generations = 50
+steps_final = generations * cell_num
+
+# number of genotypes possible
+genotype_num = 8
+
+# Cost of gene expression
 
 S_cost = 3
 R_cost = 8
@@ -54,8 +71,16 @@ S = sp.rand(N, N) < 0.5
 R = sp.rand(N, N) < 0.5
 C = sp.rand(N, N) < 0.5
 
-# we'll increase this by one every time two cells compete.
-tick = 0
+## data sampling
+# we will take a frequency sample some number of times per generation
+steps_per_gen = N**2
+samples_per_gen = 100
+samples_num = samples_per_gen * generations
+steps_per_sample = sp.uint32(sp.floor(1.0 * steps_per_gen / samples_per_gen))
+sample_count = 0
+# We want to know the frequency of each genotype per generation
+samples_frequency = sp.empty((samples_num, genotype_num))
+samples_nhood = sp.empty((samples_num, genotype_num, genotype_num))
 
 ## main stuff
 
@@ -66,7 +91,7 @@ screen = pygame.display.set_mode((N*4, N*4))
 pygame.display.set_caption("lets see")
 
 def competition():
-    global C, R, S, tick
+    global C, R, S, step
     ## compete
     competitor_1, competitor_2 = competiroll(N)
     # competitor_2's coordinates in a torus:
@@ -78,30 +103,30 @@ def competition():
         competitor_1, competitor_2 = competiroll(N)
         competitor_2t = competitor_2 % N
         # time passes:
-        tick += 1
-    print "competitor_1, competitor_2"
-    print competitor_1, competitor_2
+        step += 1
+#    print "competitor_1, competitor_2"
+#    print competitor_1, competitor_2
     # here we produce torusified versions of the boards.
     # for signallers, we take both S_rad and C_rad around our competitors because,
     # signallers affect receptive && cooperating cells which affect our competitors
     S_sub = S[sp.arange(- S_rad - C_rad, S_rad + C_rad + 1)%N, :][:, sp.arange(- S_rad - C_rad, S_rad + C_rad + 1)%N]
     R_sub = R[sp.arange(- C_rad, C_rad + 1)%N, :][:, sp.arange(- C_rad, C_rad + 1)%N]
     C_sub = C[sp.arange(- C_rad, C_rad + 1)%N, :][:, sp.arange(- C_rad, C_rad + 1)%N]
-    print "S_sub.shape, R_sub.shape, C_sub.shape"
-    print S_sub.shape, R_sub.shape, C_sub.shape
+#    print "S_sub.shape, R_sub.shape, C_sub.shape"
+#    print S_sub.shape, R_sub.shape, C_sub.shape
     # we count how many signallers are within each cell's neighbourhood
     S_conv = sp.signal.convolve2d(S_sub, S_counter, mode='valid')
     # a cell will produce common goods if it's receptive and cooperative and signal in its neighborhood is above threshold
     cooping_cells = (C_sub == R_sub) == (S_conv > S_th)
     # how many cooperators around each competitor?
-    print "cooping_cells"
-    print cooping_cells.shape
-    print cooping_cells
+#    print "cooping_cells"
+#    print cooping_cells.shape
+#    print cooping_cells
     C_conv = sp.signal.convolve2d(cooping_cells, C_counter, mode='valid')
     # Public goods effect.
     # G for Goods
     G = (C_conv > C_th)
-    print "G.shape", G.shape
+#    print "G.shape", G.shape
     # all cells for which the effect of goods is above threshold is True in G.
     # M for Metabolism
     cost_board = S_cost * S + R_cost * R + C_cost * C
@@ -113,7 +138,7 @@ def competition():
         S[competitor_1[0], competitor_1[1]] = S[competitor_2t[0], competitor_2t[1]]
         R[competitor_1[0], competitor_1[1]] = R[competitor_2t[0], competitor_2t[1]]
     elif M[competitor_1[0], competitor_1[1]] == M[competitor_2t[0], competitor_2t[1]]:
-        print 'buga'
+        nothing #print 'buga'
     else:
         C[competitor_2t[0], competitor_2t[1]] = C[competitor_1[0], competitor_1[1]]
         S[competitor_2t[0], competitor_2t[1]] = S[competitor_1[0], competitor_1[1]]
@@ -136,14 +161,22 @@ def diffuse():
     else:
         for board in [R, S, C]:
             board[[m, m, m1, m1], [n, n1, n1, n]] = board[[m, m1, m1, m], [n1, n1, n, n]]
-
+def sampling():
+    global sample_count, samples_frequency, samples_nhood
+    if not step % steps_per_sample:
+        samples_frequency[sample_count] = sample_count
+        samples_nhood[sample_count] = sample_count
+        sample_count += 1
+            
 def mainstuff():
-    global while_count, tick, data
+    global while_count, step, data
     #print "while_count", while_count
     competition()
     diffuse()
-    tick += 1
+    sampling()
+    step += 1
     while_count += 1
+    print step
 
 ## process data
 
