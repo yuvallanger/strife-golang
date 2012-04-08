@@ -6,6 +6,8 @@ import pygame
 
 # TODO: How do I figure out what's the wanted frequency of mutation and diffusion?
 # TODO: Where exactly do I "global foo"? In which scopes and namespaces does "foo" lives?
+# BUG: check for sameness shouldn't be on its own loop but just at the top of the algorithm's loop so each check will be followed.immediately by one diffuse call and one mutate call.
+# 
 
 ## functions
 
@@ -86,9 +88,9 @@ samples_nhood = sp.empty((samples_num, genotype_num, genotype_num))
 
 # pygame initialization
 
-pygame.init()
-screen = pygame.display.set_mode((N*4, N*4))
-pygame.display.set_caption("lets see")
+#pygame.init()
+#screen = pygame.display.set_mode((N*4, N*4))
+#pygame.display.set_caption("lets see")
 
 def competition():
     global C, R, S, step
@@ -152,6 +154,7 @@ def mutate():
         B[coords[0], coords[1]] = sp.random.randint(2)
 
 def diffuse():
+    global R, S, C
     m, n = sp.random.randint(N, size=2)
     m1, n1 = (m+1)%N, (n+1)%N
     if sp.random.randint(2):
@@ -161,7 +164,21 @@ def diffuse():
     else:
         for board in [R, S, C]:
             board[[m, m, m1, m1], [n, n1, n1, n]] = board[[m, m1, m1, m], [n1, n1, n, n]]
-def sampling():
+
+def sample_frequency():
+    global S, R, C
+    res = zeros(8, dtype='uint32')
+    for i in sp.arange(8):
+        res[i] = sum(bool8((not 1 & i) ^ S) +
+                     bool8((not 2 & i) ^ R) +
+                     bool8((not 4 & i) ^ C))
+    return res
+
+def sample_nhood():
+    global S, R, C
+    res = zeros((8, 8), dtype='uint32')
+    
+def sample():
     global sample_count, samples_frequency, samples_nhood
     if not step % steps_per_sample:
         samples_frequency[sample_count] = sample_count
@@ -173,7 +190,7 @@ def mainstuff():
     #print "while_count", while_count
     competition()
     diffuse()
-    sampling()
+    sample()
     step += 1
     while_count += 1
     print step
@@ -197,7 +214,7 @@ def update_display():
     screen.blit(image, (0, 0))
     pygame.display.flip()
 
-clock = pygame.time.Clock()
+#clock = pygame.time.Clock()
 
 # infinite loop
 
@@ -205,5 +222,5 @@ while_count = 0
 
 while True:
     mainstuff() # the main algorithm
-    imagify_data()
-    update_display()
+#    imagify_data()
+#    update_display()
