@@ -4,15 +4,6 @@ import scipy as sp
 import scipy.signal
 import pygame
 
-# TODO: How do I figure out what's the wanted frequency of mutation and
-#       diffusion?
-# TODO: Where exactly do I "global foo"? In which scopes and namespaces does
-#       "foo" lives?
-# TODO: BUG: check for sameness shouldn't be on its own loop but just at the
-#       top of the algorithm's loop so each check will be followed.immediately
-#       by one diffuse call and one mutate call.
-# TODO: Getting this into OO
-
 class gos:
     def __init__(self):
         ## settings
@@ -85,7 +76,7 @@ class gos:
 
     ## functions
 
-    def competiroll(N):
+    def competiroll(self, N):
         #"""draw two competitor positions stuff"""
         # We'll use relative positions to compute exact positions of 2nd competitor cell
         NEIGHBOUR_ROW = sp.array([-1,  0,  1, -1,  0,  1, -1,  1])
@@ -96,19 +87,17 @@ class gos:
         return c1, c2
 
     def competition(self):
-        global C, R, S, step
+        #global C, R, S, step
         # compete
         competitor_1, competitor_2 = self.competiroll(self.N)
         # competitor_2's coordinates in a torus:
         competitor_2t = competitor_2 % self.N
-        # we'll run this until we get a pair of competitors that are actually different:
-        while ((self.R[competitor_1[0], competitor_1[1]] == self.R[competitor_2t[0], competitor_2t[1]]) and
+        # two identical cells competing will result in two identical cells,
+        # so no need for further calculation.
+        if ((self.R[competitor_1[0], competitor_1[1]] == self.R[competitor_2t[0], competitor_2t[1]]) and
                (self.S[competitor_1[0], competitor_1[1]] == self.S[competitor_2t[0], competitor_2t[1]]) and
                (self.C[competitor_1[0], competitor_1[1]] == self.C[competitor_2t[0], competitor_2t[1]])):
-            competitor_1, competitor_2 = self.competiroll(self.N)
-            competitor_2t = competitor_2 % self.N
-            # time passes:
-            self.step += 1
+            return
         # print "competitor_1, competitor_2"
         # print competitor_1, competitor_2
         # here we produce torusified versions of the boards.
@@ -138,7 +127,7 @@ class gos:
         M = G * (1 - self.benefit) * cost_board
         # all false in G don't benefit from public goods (G^True flips values)
         M += (G^True) *  cost_board
-        if self.M[competitor_1[0], competitor_1[1]] > self.M[competitor_2t[0], competitor_2t[1]]:
+        if M[competitor_1[0], competitor_1[1]] > M[competitor_2t[0], competitor_2t[1]]:
             self.C[competitor_1[0], competitor_1[1]] = self.C[competitor_2t[0], competitor_2t[1]]
             self.S[competitor_1[0], competitor_1[1]] = self.S[competitor_2t[0], competitor_2t[1]]
             self.R[competitor_1[0], competitor_1[1]] = self.R[competitor_2t[0], competitor_2t[1]]
@@ -167,38 +156,38 @@ class gos:
                 board[[m, m, m1, m1], [n, n1, n1, n]] = board[[m, m1, m1, m], [n1, n1, n, n]]
 
     def sample(self):
-        global S, R, C, sample_count, samples_frequency, samples_nhood
+        #global S, R, C, sample_count, samples_frequency, samples_nhood
         for genotype in sp.arange(8):
             genotype_board = (sp.bool8((not 1 & genotype) ^ self.S) +
                               sp.bool8((not 2 & genotype) ^ self.R) +
                               sp.bool8((not 4 & genotype) ^ self.C))
             for j in sp.arange(8):
                 genotype_board
-                self.sample_nhood[self.sample_count, genotype]
-            self.sample_frequency[self.sample_count, genotype] = sum(genotype_board)
-        print sum(self.sample_frequency[self.sample_count])
+                self.samples_nhood[self.sample_count, genotype]
+            self.samples_frequency[self.sample_count, genotype] = sum(genotype_board)
+        print sum(self.samples_frequency[self.sample_count])
         self.sample_count += 1
                 
-    def mainstuff(self):
-        global while_count, step, data
+    def nextstep(self):
+        #global while_count, step, data
         #print "while_count", while_count
         self.competition()
         self.diffuse()
-        if not self.step % self.steps_per_sample: self.sample()
-        while_count += 1
+        #if not self.step % self.steps_per_sample: self.sample()
         print self.step
+        self.step += 1
 
     ## process data
 
     def imagify_data(self):
-        global image, S, R, C
+        #global image, S, R, C
         ## package data
         data = sp.empty((self.N, self.N, 3))
         data[:, :, 0] = self.S
         data[:, :, 1] = self.R
         data[:, :, 2] = self.C
         resized_data = (255*data).repeat(4, axis=0).repeat(4, axis=1)
-        image = pygame.surfarray.make_surface(resized_data)
+        return pygame.surfarray.make_surface(resized_data)
 
 ### update display
 #
@@ -211,11 +200,12 @@ class gos:
 
 # infinite loop
 
-while_count = 0
-#a = gos()
-while True:
-#    a.mainstuff() # the main algorithm
-#    imagify_data()
-#    update_display()
-    print while_count
-    while_count += 1
+if __name__ == '__main__':
+    while_count = 0
+    a = gos()
+    while True:
+        a.nextstep() # the main algorithm
+    #    imagify_data()
+    #    update_display()
+    #    print while_count
+        while_count += 1

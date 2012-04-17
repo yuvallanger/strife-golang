@@ -1,0 +1,10 @@
+# TODO: How do I figure out what's the wanted frequency of mutation and
+#       diffusion?
+# CANC: Where exactly do I "global foo"? In which scopes and namespaces does
+#       "foo" lives?
+
+2012-04-17
+# DONE: BUG: check for sameness shouldn't be on its own loop but just at the
+#       top of the algorithm's loop so each check will be followed.immediately
+#       by one diffuse call and one mutate call.
+# DONE: Getting this into OO
