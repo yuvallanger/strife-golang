@@ -1,15 +1,17 @@
-## A model by Dr. Avigdor Eldar based on 
+"""
+A model by Dr. Avigdor Eldar based on Czárán's work.
+"""
 
 import scipy as sp
 import scipy.signal
 import pygame
 
 class gos:
-    def __init__(self):
+    def __init__(self, N=300):
         ## settings
         
         # Board size
-        self.N = 50
+        self.N = N
         self.cell_num = self.N**2
         
         ## time keeping
@@ -86,10 +88,10 @@ class gos:
         c2 = c1 + NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)[0]]
         return c1, c2
 
-    def competition(self):
+    def competition(self, N):
         #global C, R, S, step
         # compete
-        competitor_1, competitor_2 = self.competiroll(self.N)
+        competitor_1, competitor_2 = self.competiroll(N)
         # competitor_2's coordinates in a torus:
         competitor_2t = competitor_2 % self.N
         # two identical cells competing will result in two identical cells,
