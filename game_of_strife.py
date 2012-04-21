@@ -1,13 +1,16 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 """
 A model by Dr. Avigdor Eldar based on Czárán's work.
+http://www.plosone.org/article/info:doi/10.1371/journal.pone.0006655
 """
 
 import scipy as sp
 import scipy.signal
 import pygame
 
-class gos:
-    def __init__(self, N=300):
+class game_of_strife:
+    def __init__(self, N=10):
         ## settings
         
         # Board size
@@ -22,7 +25,7 @@ class gos:
         # we'll increase this by one every time two cells compete.
         self.step = 0
 
-        self.generations = 50
+        self.generations = 5
         self.steps_final = self.generations * self.cell_num
 
         # number of genotypes possible
@@ -33,9 +36,13 @@ class gos:
         self.S_cost = 3
         self.R_cost = 8
         self.C_cost = 30
+        self.B_cost = 100 # B for Baseline
 
         # cooperation benefit, in ratio
         self.benefit = 0.3
+        
+        # mutation per generation
+        self.mutationrate = 0.001
         
         # radius
         self.S_rad = 1
@@ -62,12 +69,12 @@ class gos:
         ## data sampling
         # we will take a frequency sample some number of times per generation
         self.steps_per_gen = self.N**2
-        self.samples_per_gen = 100
+        self.samples_per_gen = 1
         self.samples_num = self.samples_per_gen * self.generations
         self.steps_per_sample = sp.uint32(sp.floor(1.0 * self.steps_per_gen / self.samples_per_gen))
         self.sample_count = 0
         # We want to know the frequency of each genotype per generation
-        self.samples_frequency = sp.empty((self.samples_num, self.genotype_num))
+        self.samples_frequency = sp.empty((self.samples_num, self.genotype_num), dtype='int32')
         self.samples_nhood = sp.empty((self.samples_num, self.genotype_num, self.genotype_num))
 
         # pygame initialization
@@ -78,20 +85,19 @@ class gos:
 
     ## functions
 
-    def competiroll(self, N):
+    def competiroll(self):
         #"""draw two competitor positions stuff"""
         # We'll use relative positions to compute exact positions of 2nd competitor cell
         NEIGHBOUR_ROW = sp.array([-1,  0,  1, -1,  0,  1, -1,  1])
         NEIGHBOUR_COL = sp.array([-1, -1, -1,  1,  1,  1,  0,  0])
         NEIGHBOUR_REL_POS = sp.array(zip(NEIGHBOUR_ROW, NEIGHBOUR_COL))
-        c1 = sp.random.randint(N, size=2)
+        c1 = sp.random.randint(self.N, size=2)
         c2 = c1 + NEIGHBOUR_REL_POS[sp.random.randint(8, size=1)[0]]
         return c1, c2
 
-    def competition(self, N):
-        #global C, R, S, step
+    def competition(self):
         # compete
-        competitor_1, competitor_2 = self.competiroll(N)
+        competitor_1, competitor_2 = self.competiroll()
         # competitor_2's coordinates in a torus:
         competitor_2t = competitor_2 % self.N
         # two identical cells competing will result in two identical cells,
@@ -125,7 +131,7 @@ class gos:
         #    print "G.shape", G.shape
         # all cells for which the effect of goods is above threshold is True in G.
         # M for Metabolism
-        cost_board = self.S_cost * self.S + self.R_cost * self.R + self.C_cost * self.C
+        cost_board = self.B_cost + self.S_cost * self.S + self.R_cost * self.R + self.C_cost * self.C
         M = G * (1 - self.benefit) * cost_board
         # all false in G don't benefit from public goods (G^True flips values)
         M += (G^True) *  cost_board
@@ -141,7 +147,7 @@ class gos:
             self.R[competitor_2t[0], competitor_2t[1]] = self.R[competitor_1[0], competitor_1[1]]    
 
     def mutate(self):
-        if sp.random.random()>0.1:
+        if sp.random.random() < 0.05:
             coords = sp.random.randint(self.N, size=2)
             B = [self.C, self.R, self.S][sp.random.randint(3)]
             B[coords[0], coords[1]] = sp.random.randint(2)
@@ -158,37 +164,41 @@ class gos:
                 board[[m, m, m1, m1], [n, n1, n1, n]] = board[[m, m1, m1, m], [n1, n1, n, n]]
 
     def sample(self):
-        #global S, R, C, sample_count, samples_frequency, samples_nhood
-        for genotype in sp.arange(8):
-            genotype_board = (sp.bool8((not 1 & genotype) ^ self.S) +
-                              sp.bool8((not 2 & genotype) ^ self.R) +
-                              sp.bool8((not 4 & genotype) ^ self.C))
-            for j in sp.arange(8):
-                genotype_board
-                self.samples_nhood[self.sample_count, genotype]
-            self.samples_frequency[self.sample_count, genotype] = sum(genotype_board)
-        print sum(self.samples_frequency[self.sample_count])
+        for genotype in range(8):
+            genotype_board = self.S + 2 * self.R + 4 * self.C == genotype
+            genotype_frequency = sp.sum(genotype_board)
+#            for j in range(8):
+#                genotype_board
+#                self.samples_nhood[self.sample_count, genotype]
+            self.samples_frequency[self.sample_count, genotype] = genotype_frequency
         self.sample_count += 1
                 
     def nextstep(self):
-        #global while_count, step, data
-        #print "while_count", while_count
         self.competition()
+        self.mutate()
         self.diffuse()
-        #if not self.step % self.steps_per_sample: self.sample()
-        print self.step
+        if not self.step % self.steps_per_sample: self.sample()
+        #print self.step
         self.step += 1
 
     ## process data
-
+    
+    def stratificatied(self):
+        res = sp.empty((self.sample_num, self.genotype_num))
+        for i in range(self.genotype_num):
+            res[:,i] = sp.array([self.samples_frequency[:,i] + sp.sum(self.samples_frequency[:,:i])])
+        return res
+            
     def imagify_data(self):
-        #global image, S, R, C
-        ## package data
-        data = sp.empty((self.N, self.N, 3))
-        data[:, :, 0] = self.S
-        data[:, :, 1] = self.R
-        data[:, :, 2] = self.C
-        resized_data = (255*data).repeat(4, axis=0).repeat(4, axis=1)
+        ## package boards' data into a displayable array.
+        return sp.array([self.S, self.R, self.C])
+    
+    def display_frequency_timeseries(self):
+        for i in range(8):
+            sp.plot(sp.arange(self.samples_num), self.samples_frequency[:,i], label=str(i), fillstyle='bottom')
+
+def make_surface(image_data):
+        resized_data = (255 * image_data).repeat(4, axis=0).repeat(4, axis=1)
         return pygame.surfarray.make_surface(resized_data)
 
 ### update display
@@ -200,14 +210,12 @@ class gos:
 
 #clock = pygame.time.Clock()
 
-# infinite loop
-
 if __name__ == '__main__':
-    while_count = 0
-    a = gos()
-    while True:
-        a.nextstep() # the main algorithm
+    a = game_of_strife()
+    for i in range(a.steps_final):
+        a.nextstep()
     #    imagify_data()
     #    update_display()
     #    print while_count
-        while_count += 1
+    sp.plot(a.samples_num, a.samples_frequency)
+    raw_input('Cool, eh?')
