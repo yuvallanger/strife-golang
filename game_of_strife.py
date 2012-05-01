@@ -234,6 +234,9 @@ class game_of_strife:
             self.B[:, (m, m, m1, m1), (n, n1, n1, n)] = self.B[:, (m1, m, m, m1), (n, n, n1, n1)]
         else:
             self.B[:, (m, m, m1, m1), (n, n1, n1, n)] = self.B[:, (m1, m, m, m1), (n, n, n1, n1)]
+    
+    def save(self, f):
+        pass
 
 #    def diffuse(self):
 #        m, n = sp.random.randint(self.N, size=2)
