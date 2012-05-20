@@ -5,6 +5,9 @@ A model by Dr. Avigdor Eldar based on Czárán's work.
 http://www.plosone.org/article/info:doi/10.1371/journal.pone.0006655
 """
 
+import cython
+import h5py
+import copy
 import os
 import gc
 import time
@@ -15,6 +18,9 @@ import scipy.signal
 #import pylab as pl
 #import timeit
 #import sys
+
+labels = ['Ignorant (crs)', 'Liar (crS)', 'Voyeur (cRs)', 'Lame (cRS)',
+          'Blunt (Crs)', 'Vain (CrS)', 'Shy (CRs)', 'Honest (CRS)']
 
 class game_of_strife:
     def __init__(self, N=10, generations=1):
@@ -116,9 +122,10 @@ class game_of_strife:
         ## We will optimize by taking a sub array from each genotype array around the competitors.
 
         # rl, ch - row low, col high
-        rl, rh = sp.sort([c_pos_1[0], c_pos_2[0]])
-        cl, ch = sp.sort([c_pos_1[1], c_pos_2[1]])
-
+#        twosort = lambda x, y: (x, y) if x < y else (y, x)
+        rl, rh = c_pos_1[0], c_pos_2[0] if c_pos_1[0] < c_pos_2[0] else (c_pos_2[0], c_pos_1[0])
+        cl, ch = c_pos_1[1], c_pos_2[1] if c_pos_1[1] < c_pos_2[1] else (c_pos_2[1], c_pos_1[1])
+        
         # For signallers, we take both S_rad and C_rad around our competitors because
         # signallers affect CR[Ss] cells which, with their public goods, affect our competitors
         s_r_range = sp.arange(rl - self.S_rad - self.C_rad, rh + self.S_rad + self.C_rad + 1) % self.N
@@ -216,7 +223,7 @@ class game_of_strife:
                     self.endgame(c_pos_1, c_pos_2t)
     
     def endgame(self, winner, loser):
-        self.copycell(copy=loser, orig=winner)
+        self.copycell(winner, loser)
         self.mutate(loser)
         
     def copycell(self, orig, copy):
@@ -230,7 +237,7 @@ class game_of_strife:
     def diffuse(self):
         m, n = sp.random.randint(self.N, size=2)
         m1, n1 = (m + 1) % self.N, (n + 1) % self.N
-        if sp.random.rand()<0.5:
+        if sp.random.rand() < 0.5:
             self.B[:, (m, m, m1, m1), (n, n1, n1, n)] = self.B[:, (m1, m, m, m1), (n, n, n1, n1)]
         else:
             self.B[:, (m, m, m1, m1), (n, n1, n1, n)] = self.B[:, (m1, m, m, m1), (n, n, n1, n1)]
@@ -277,7 +284,7 @@ class game_of_strife:
     def imagify_data(self):
         ## package boards' data into a displayable array.
         return sp.array([self.S, self.R, self.C])
-    
+
 #    def display_frequency_timeseries(self):
 #        for i in range(8):
 #            pl.plot(sp.arange(self.samples_num), self.samples_frequency[:,i], label=str(i), fillstyle='bottom')
@@ -306,6 +313,7 @@ def go(a):
     t = time.time()
     every = 1200
     print t, a.step_count
+    steps_0 = a.step_count
     while a.step_count < a.steps_final:
         a.nextstep()
         delta_t = time.time() - t
@@ -313,16 +321,86 @@ def go(a):
             picklize(a)
             t = time.time()
             gc.collect()
-            print t, a.step_count
+            steps_delta = a.step_count - steps_0
+            steps_0 = a.step_count
+            print t, a.step_count, steps_delta
+
+def loadstrife(a, f='strife_in_a_jar.h5'):
+    ff = h5py.File(f)
+    a=game_of_strife()
+    
+    a.N = ff['N']
+    a.cell_num = ff['cell_num']
+    a.step_count = ff['step_count']
+    a.generations = ff['generations']
+    a.steps_final = ff['steps_final']
+    a.genotype_num = ff['genotype_num']
+    a.S_cost = ff['S_cost']
+    a.R_cost = ff['R_cost']
+    a.C_cost = ff['C_cost']
+    a.B_cost = ff['B_cost']
+    a.benefit = ff['benefit']
+    a.mutation_rate = ff['mutation_rate']
+    a.S_rad = ff['S_rad']
+    a.C_rad = ff['C_rad']
+    a.S_len = ff['S_len']
+    a.C_len = ff['C_len']
+    a.S_kernel = ff['S_kernel']
+    a.C_kernel = ff['C_kernel']
+    a.S_th = ff['S_th']
+    a.C_th = ff['C_th']
+    a.B = ff['B']
+    a.steps_per_gen = ff['steps_per_gen']
+    a.samples_per_gen = ff['samples_per_gen']
+    a.samples_num = ff['samples_num']
+    a.steps_per_sample = ff['steps_per_sample']
+    a.sample_count = ff['sample_count']
+    a.samples_frequency = ff['samples_frequency']
+    a.samples_nhood = ff['samples_nhood']
+def savestrife(a, f='strife_in_a_jar.h5'):
+    ff = h5py.File(f)
+    ff['N'] = a.N
+    ff['cell_num'] = a.cell_num
+    ff['step_count'] = a.step_count
+    ff['generations'] = a.generations
+    ff['steps_final'] = a.steps_final
+    ff['genotype_num'] = a.genotype_num
+    ff['S_cost'] = a.S_cost
+    ff['R_cost'] = a.R_cost
+    ff['C_cost'] = a.C_cost
+    ff['B_cost'] = a.B_cost
+    ff['benefit'] = a.benefit
+    ff['mutation_rate'] = a.mutation_rate
+    ff['S_rad'] = a.S_rad
+    ff['C_rad'] = a.C_rad
+    ff['S_len'] = a.S_len
+    ff['C_len'] = a.C_len
+    ff['S_kernel'] = a.S_kernel
+    ff['C_kernel'] = a.C_kernel
+    ff['S_th'] = a.S_th
+    ff['C_th'] = a.C_th
+    ff['B'] = a.B
+    ff['steps_per_gen'] = a.steps_per_gen
+    ff['samples_per_gen'] = a.samples_per_gen
+    ff['samples_num'] = a.samples_num
+    ff['steps_per_sample'] = a.steps_per_sample
+    ff['sample_count'] = a.sample_count
+    ff['samples_frequency'] = a.samples_frequency
+    ff['samples_nhood'] = a.samples_nhood
 
 if __name__ == '__main__':
-    if os.path.exists(r'strife_in_a_jar.pk'):
-        a = pickle.load(open('strife_in_a_jar.pk', 'rb'))
-        go(a)
-    else:
-        a = game_of_strife(N=300, generations=10000)
-        go(a)
-    picklize(a)
+    f = open('strife_in_a_jar_complete.pk', 'rb')
+    a = pickle.load(f)
+    savestrife(a)
+#    if os.path.exists(r'strife_in_a_jar.pk'):
+#        f = open('strife_in_a_jar.pk', 'rb')
+#        a = pickle.load(f)
+#        f.close()
+#        go(a)
+#    else:
+#        a = game_of_strife(N=300, generations=10000)
+#        go(a)
+#    picklize(a)
         
     #    imagify_data()
     #    update_display()
