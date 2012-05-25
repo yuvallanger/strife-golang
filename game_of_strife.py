@@ -15,12 +15,12 @@ import pickle
 import scipy as sp
 import scipy.signal
 #import pygame
-#import pylab as pl
+import pylab as pl
 #import timeit
 #import sys
 
-labels = ['Ignorant (crs)', 'Liar (crS)', 'Voyeur (cRs)', 'Lame (cRS)',
-          'Blunt (Crs)', 'Vain (CrS)', 'Shy (CRs)', 'Honest (CRS)']
+labels = ['Ignorant (csr)', 'Voyeur (csR)', 'Liar (cSr)', 'Lame (cSR)',
+          'Blunt (Csr)', 'Shy (CsR)', 'Vain (CSr)', 'Honest (CSR)']
 
 class game_of_strife:
     def __init__(self, N=10, generations=1):
@@ -80,10 +80,10 @@ class game_of_strife:
         # Cooperation threshold. Above it, public goods makes a difference.
 
         # A cell can be Signalling and/or Receptive and/or Cooperative
-        self.B = sp.ones((3, self.N, self.N), dtype='bool')
-#        self.S = self.B[0]
-#        self.R = self.B[1]
-#        self.C = self.B[2]
+        R = sp.zeros((self.N, self.N), dtype='bool')
+        S = sp.zeros((self.N, self.N), dtype='bool')
+        C = sp.ones((self.N, self.N), dtype='bool')
+        self.B = sp.array([R, S, C])
 
         ## data sampling
         # we will take a frequency sample some number of times per generation
@@ -95,12 +95,6 @@ class game_of_strife:
         # We want to know the frequency of each genotype per generation
         self.samples_frequency = sp.empty((self.samples_num, self.genotype_num), dtype='int32')
         self.samples_nhood = sp.empty((self.samples_num, self.genotype_num, self.genotype_num))
-
-        # pygame initialization
-
-        #pygame.init()
-        #screen = pygame.display.set_mode((N*4, N*4))
-        #pygame.display.set_caption("lets see")
 
     ## functions
     
@@ -123,28 +117,19 @@ class game_of_strife:
 
         # rl, ch - row low, col high
 #        twosort = lambda x, y: (x, y) if x < y else (y, x)
-        rl, rh = c_pos_1[0], c_pos_2[0] if c_pos_1[0] < c_pos_2[0] else (c_pos_2[0], c_pos_1[0])
-        cl, ch = c_pos_1[1], c_pos_2[1] if c_pos_1[1] < c_pos_2[1] else (c_pos_2[1], c_pos_1[1])
+        rl, rh = (c_pos_1[0], c_pos_2[0]) if c_pos_1[0] < c_pos_2[0] else (c_pos_2[0], c_pos_1[0])
+        cl, ch = (c_pos_1[1], c_pos_2[1]) if c_pos_1[1] < c_pos_2[1] else (c_pos_2[1], c_pos_1[1])
         
         # For signallers, we take both S_rad and C_rad around our competitors because
         # signallers affect CR[Ss] cells which, with their public goods, affect our competitors
-        s_r_range = sp.arange(rl - self.S_rad - self.C_rad, rh + self.S_rad + self.C_rad + 1) % self.N
-        s_c_range = sp.arange(cl - self.S_rad - self.C_rad, ch + self.S_rad + self.C_rad + 1) % self.N
-        rc_r_range = sp.arange(rl - self.C_rad, rh + self.C_rad + 1) % self.N
-        rc_c_range = sp.arange(cl - self.C_rad, ch + self.C_rad + 1) % self.N
+        s_row_range = sp.arange(rl - self.S_rad - self.C_rad, rh + self.S_rad + self.C_rad + 1) % self.N
+        s_col_range = sp.arange(cl - self.S_rad - self.C_rad, ch + self.S_rad + self.C_rad + 1) % self.N
+        rc_row_range = sp.arange(rl - self.C_rad, rh + self.C_rad + 1) % self.N
+        rc_col_range = sp.arange(cl - self.C_rad, ch + self.C_rad + 1) % self.N
 
-        S_sub = self.B[0, s_r_range, :][:, s_c_range]
-        R_sub = self.B[1, rc_r_range, :][:, rc_c_range]
-        C_sub = self.B[2, rc_r_range, :][:, rc_c_range]
-
-#        raw_input(S_sub)
-#        raw_input(S_sub.shape)
-#        raw_input(R_sub)
-#        raw_input(R_sub.shape)
-#        raw_input(C_sub)
-#        raw_input(C_sub.shape)
-        #    print "S_sub.shape, R_sub.shape, C_sub.shape"
-        #    print S_sub.shape, R_sub.shape, C_sub.shape
+        R_sub = self.B[0, rc_row_range, :][:, rc_col_range]
+        S_sub = self.B[1, s_row_range, :][:, s_col_range]
+        C_sub = sp.ones((2 * self.C_rad + sp.absolute(rl-rh), 2 * self.C_rad + sp.absolute(cl-ch)), dtype='bool')
 
         # we count how many signallers are within each cell's neighbourhood
         #print S_sub.shape
@@ -152,7 +137,9 @@ class game_of_strife:
 
         # a cell will produce common goods if it's receptive and cooperative and signal in its neighborhood is above threshold
         # or when it's unreceptive and cooperative, with no regard to signal in its neighbourhood.
-        cooping_cells = ((C_sub & R_sub) & (S_conv > self.S_th)) | (C_sub & (R_sub ^ True))
+        # We'll use the C.all() == True version for the Rock Paper Sciccors version.
+#        cooping_cells = ((C_sub & R_sub) & (S_conv > self.S_th)) | (C_sub & (R_sub ^ True))
+        cooping_cells = (R_sub & (S_conv > self.S_th)) | (R_sub ^ True)
         # how many cooperators around each competitor?
         #    print "cooping_cells"
         #    print cooping_cells.shape
@@ -164,9 +151,12 @@ class game_of_strife:
         #    print "G.shape", G.shape
         # all cells for which the effect of goods is above threshold is True in G.
         # M for Metabolism
-        S_cost_board = self.S_cost * self.B[0, sp.arange(rl, rh + 1) % self.N, :][:, sp.arange(cl, ch + 1) % self.N]
-        R_cost_board = self.R_cost * self.B[1, sp.arange(rl, rh + 1) % self.N, :][:, sp.arange(cl, ch + 1) % self.N]
-        C_cost_board = self.C_cost * self.B[2, sp.arange(rl, rh + 1) % self.N, :][:, sp.arange(cl, ch + 1) % self.N]
+        # Rock Paper Scissors => C.all() == True
+        twocellpos_r, twocellpos_c = sp.arange(rl, rh + 1) % self.N, sp.arange(cl, ch + 1) % self.N
+        twocellrange_c = sp.arange(cl, ch + 1)
+        R_cost_board = self.R_cost * self.B[0, twocellpos_r, twocellpos_c]
+        S_cost_board = self.S_cost * self.B[1, twocellpos_r, twocellpos_c]
+        C_cost_board = self.C_cost * sp.array([True, True], dtype='bool')
         Total_cost_board = S_cost_board + R_cost_board + C_cost_board + self.B_cost
         M = G * (1 - self.benefit) * Total_cost_board
         # all false in G don't benefit from public goods (G^True flips values)
@@ -231,8 +221,8 @@ class game_of_strife:
 
     def mutate(self, pos):
         if sp.rand() < self.mutation_rate:
-            loci = sp.random.randint(3)
-            self.B[loci, pos[0], pos[1]] = self.B[loci, pos[0], pos[1]] ^ self.B[loci, pos[0], pos[1]]
+            loci = sp.random.randint(1,3) # We will only mutate S and R, never C. C stays uppercase.
+            self.B[loci, pos[0], pos[1]] = self.B[loci, pos[0], pos[1]] ^ True
 
     def diffuse(self):
         m, n = sp.random.randint(self.N, size=2)
@@ -257,12 +247,16 @@ class game_of_strife:
 #                board[(m, m, m1, m1), (n, n1, n1, n)] = board[(m, m1, m1, m), (n1, n1, n, n)]
 
     def sample(self):
+        joint_board = self.B[0] + 2 * self.B[1] + 4 * self.B[2]
         for genotype in range(8):
-            genotype_board = self.B[0] + 2 * self.B[1] + 4 * self.B[2] == genotype
+            genotype_board = joint_board == genotype
             genotype_frequency = sp.sum(genotype_board)
-#            for j in range(8):
-#                genotype_board
-#                self.samples_nhood[self.sample_count, genotype]
+            # neighbours_genotype
+            for nh_genotype in range(8):
+                nh_board = joint_board == nh_genotype
+                nh_genotype_count = sp.signal.convolve2d(nh_board, sp.ones((3,3)), mode='same', boundary='wrap')
+                nh_genotype_count_of_genotype = sp.sum(nh_genotype_count * genotype_board)
+                self.samples_nhood[self.sample_count, genotype, nh_genotype] = nh_genotype_count_of_genotype
             self.samples_frequency[self.sample_count, genotype] = genotype_frequency
         self.sample_count += 1
 
@@ -311,24 +305,26 @@ def picklize(a):
 
 def go(a):
     t = time.time()
-    every = 1200
-    print t, a.step_count
+    every = 900
+    print t, a.step_count, "yo"
     steps_0 = a.step_count
     while a.step_count < a.steps_final:
         a.nextstep()
         delta_t = time.time() - t
         if delta_t > every:
-            picklize(a)
             t = time.time()
-            gc.collect()
+            savestrife(a, 'data.npz')
             steps_delta = a.step_count - steps_0
             steps_0 = a.step_count
+            print t, 1.0 * delta_t / steps_delta * (a.steps_final - a.step_count)
             print t, a.step_count, steps_delta
 
-def loadstrife(a, f='strife_in_a_jar.h5'):
-    ff = h5py.File(f)
-    a=game_of_strife()
+def loadstrife(a, fname='data.npz'):
+    ff = sp.load(fname)
+    ff = ff['arr_0']
+    ff = ff.tolist()
     
+    a=game_of_strife()
     a.N = ff['N']
     a.cell_num = ff['cell_num']
     a.step_count = ff['step_count']
@@ -357,8 +353,10 @@ def loadstrife(a, f='strife_in_a_jar.h5'):
     a.sample_count = ff['sample_count']
     a.samples_frequency = ff['samples_frequency']
     a.samples_nhood = ff['samples_nhood']
-def savestrife(a, f='strife_in_a_jar.h5'):
-    ff = h5py.File(f)
+    return a
+
+def savestrife(a, fname='data.npz'):
+    ff = {}
     ff['N'] = a.N
     ff['cell_num'] = a.cell_num
     ff['step_count'] = a.step_count
@@ -387,20 +385,27 @@ def savestrife(a, f='strife_in_a_jar.h5'):
     ff['sample_count'] = a.sample_count
     ff['samples_frequency'] = a.samples_frequency
     ff['samples_nhood'] = a.samples_nhood
+    sp.savez(fname, ff)
 
 if __name__ == '__main__':
-    f = open('strife_in_a_jar_complete.pk', 'rb')
-    a = pickle.load(f)
-    savestrife(a)
-#    if os.path.exists(r'strife_in_a_jar.pk'):
-#        f = open('strife_in_a_jar.pk', 'rb')
-#        a = pickle.load(f)
-#        f.close()
-#        go(a)
-#    else:
-#        a = game_of_strife(N=300, generations=10000)
-#        go(a)
-#    picklize(a)
+    fname = r'data.npz'
+    if os.path.exists(fname):
+        a = loadstrife(fname)
+        go(a)
+    else:
+        a = game_of_strife(N=300, generations=10000)
+        go(a)
+    
+    a = game_of_strife(N=20, generations=100)
+    go(a)
+    print a.B
+    print a.samples_nhood
+    for genotype in range(8):
+        pl.plot(a.samples_nhood[:, genotype, :])
+    pl.show()
+    pl.plot(a.samples_frequency)
+    pl.show()
+
         
     #    imagify_data()
     #    update_display()
