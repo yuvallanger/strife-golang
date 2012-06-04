@@ -322,37 +322,11 @@ def go(a):
 def loadstrife(a, fname='data.npz'):
     ff = sp.load(fname)
     ff = ff['arr_0']
-    ff = ff.tolist()
+    ff = ff.item()
     
     a=game_of_strife()
-    a.N = ff['N']
-    a.cell_num = ff['cell_num']
-    a.step_count = ff['step_count']
-    a.generations = ff['generations']
-    a.steps_final = ff['steps_final']
-    a.genotype_num = ff['genotype_num']
-    a.S_cost = ff['S_cost']
-    a.R_cost = ff['R_cost']
-    a.C_cost = ff['C_cost']
-    a.B_cost = ff['B_cost']
-    a.benefit = ff['benefit']
-    a.mutation_rate = ff['mutation_rate']
-    a.S_rad = ff['S_rad']
-    a.C_rad = ff['C_rad']
-    a.S_len = ff['S_len']
-    a.C_len = ff['C_len']
-    a.S_kernel = ff['S_kernel']
-    a.C_kernel = ff['C_kernel']
-    a.S_th = ff['S_th']
-    a.C_th = ff['C_th']
-    a.B = ff['B']
-    a.steps_per_gen = ff['steps_per_gen']
-    a.samples_per_gen = ff['samples_per_gen']
-    a.samples_num = ff['samples_num']
-    a.steps_per_sample = ff['steps_per_sample']
-    a.sample_count = ff['sample_count']
-    a.samples_frequency = ff['samples_frequency']
-    a.samples_nhood = ff['samples_nhood']
+    for key, val in ff.items():
+        a.__setattribute(key, val)
     return a
 
 def savestrife(a, fname='data.npz'):
