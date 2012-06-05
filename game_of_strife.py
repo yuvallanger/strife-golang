@@ -17,7 +17,7 @@ import scipy.signal
 #import pygame
 import pylab as pl
 #import timeit
-#import sys
+import sys
 
 labels = ['Ignorant (csr)', 'Voyeur (csR)', 'Liar (cSr)', 'Lame (cSR)',
           'Blunt (Csr)', 'Shy (CsR)', 'Vain (CSr)', 'Honest (CSR)']
@@ -326,7 +326,7 @@ class game_of_strife:
 def go(a):
     t = time.time()
     every = 900
-    print t, a.step_count, "yo"
+    print "t: %(t)f, steps thus far: %(steps)d" % {'t': t, 'steps': a.step_count}
     steps_0 = a.step_count
     while a.step_count < a.steps_final:
         a.nextstep()
@@ -336,8 +336,10 @@ def go(a):
             a.savestrife()
             steps_delta = a.step_count - steps_0
             steps_0 = a.step_count
-            print "t=%(t)s, approx. time to fin = %(eta)s" % {'t': t, 'eta': 1.0 * delta_t / steps_delta * (a.steps_final - a.step_count)}
-            print "steps taken = $(step_count)s, steps since last save = %(steps_delta)s" % {'step_count': a.step_count, 'steps_delta': steps_delta}
+            eta = 1.0 * delta_t / steps_delta * (a.steps_final - a.step_count)
+            print "t: %(t)f, approx. time to fin: %(eta)f" % {'t': t, 'eta': eta}
+            print "steps taken = %(step_count)s, steps since last save = %(steps_delta)s" % {'step_count': a.step_count, 'steps_delta': steps_delta}
+            sys.exit(1)
 
 if __name__ == '__main__':
     a = game_of_strife(N=10, generations=1)
@@ -348,13 +350,4 @@ if __name__ == '__main__':
         a = game_of_strife(N=300, generations=10000)
         go(a)
     a.savestrife()
-    
-    print a.B
-    print a.samples_nhood
-    pl.hold(True)
-    for genotype in range(8):
-        pl.plot(a.samples_frequency[:, genotype], label=labels[genotype])
-    pl.show()
-    for genotype in range(8):
-        pl.plot(a.samples_nhood[:, genotype, :], label=labels[genotype])
-    pl.show()
+    sys.exit(0)
