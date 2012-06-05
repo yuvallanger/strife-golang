@@ -104,7 +104,7 @@ class game_of_strife:
         d['sample_count'] = 0
         # We want to know the frequency of each genotype per generation
         d['samples_frequency'] = sp.empty((d['samples_num'], d['genotype_num']), dtype='int32')
-        d['samples_nhood'] = sp.empty((d['samples_num'], d['genotype_num'], d['genotype_num']))
+        d['samples_nhood'] = sp.empty((d['samples_num'], d['genotype_num'], d['genotype_num']), dtype=sp.int32)
         
         self.__init_unpack_parameters__(d)
     
@@ -325,7 +325,7 @@ class game_of_strife:
 
 def go(a):
     t = time.time()
-    every = 1
+    every = 900
     print t, a.step_count, "yo"
     steps_0 = a.step_count
     while a.step_count < a.steps_final:
@@ -336,8 +336,8 @@ def go(a):
             a.savestrife()
             steps_delta = a.step_count - steps_0
             steps_0 = a.step_count
-            print t, 1.0 * delta_t / steps_delta * (a.steps_final - a.step_count)
-            print t, a.step_count, steps_delta
+            print "t=%(t)s, approx. time to fin = %(eta)s" % {'t': t, 'eta': 1.0 * delta_t / steps_delta * (a.steps_final - a.step_count)}
+            print "steps taken = $(step_count)s, steps since last save = %(steps_delta)s" % {'step_count': a.step_count, 'steps_delta': steps_delta}
 
 if __name__ == '__main__':
     a = game_of_strife(N=10, generations=1)
@@ -345,7 +345,7 @@ if __name__ == '__main__':
         a.loadstrife()
         go(a)
     else:
-        a = game_of_strife(N=300, generations=1000)
+        a = game_of_strife(N=300, generations=10000)
         go(a)
     a.savestrife()
     
