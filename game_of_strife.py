@@ -325,7 +325,7 @@ class game_of_strife:
 
 def go(a):
     t = time.time()
-    every = 900
+    every = 1800
     print "t: %(t)f, steps thus far: %(steps)d" % {'t': t, 'steps': a.step_count}
     steps_0 = a.step_count
     while a.step_count < a.steps_final:
