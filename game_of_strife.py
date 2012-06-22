@@ -6,11 +6,8 @@ http://www.plosone.org/article/info:doi/10.1371/journal.pone.0006655
 """
 
 import h5py
-import copy
 import os
-import gc
 import time
-import pickle
 import scipy as sp
 import scipy.signal
 #import pygame
