@@ -346,7 +346,7 @@ def go(a):
             eta = 1.0 * delta_t / steps_delta * (a.steps_final - a.step_count)
             print "t: %(t)f, approx. time to fin: %(eta)f" % {'t': t, 'eta': eta}
             print "steps taken = %(step_count)s, steps since last save = %(steps_delta)s" % {'step_count': a.step_count, 'steps_delta': steps_delta}
-            #sys.exit(1)
+            sys.exit(1)
 
 if __name__ == '__main__':
     try:
