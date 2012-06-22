@@ -5,7 +5,6 @@ A model by Dr. Avigdor Eldar based on Czárán's work.
 http://www.plosone.org/article/info:doi/10.1371/journal.pone.0006655
 """
 
-import cython
 import h5py
 import copy
 import os
@@ -17,20 +16,54 @@ import scipy.signal
 #import pygame
 import pylab as pl
 #import timeit
-#import sys
+import sys
 
 labels = ['Ignorant (csr)', 'Voyeur (csR)', 'Liar (cSr)', 'Lame (cSR)',
           'Blunt (Csr)', 'Shy (CsR)', 'Vain (CSr)', 'Honest (CSR)']
 
 class game_of_strife:
     def __init__(self, N=10, generations=1):
-        ## settings
         
-        self.NEIGHBOUR_REL_POS = sp.array([(0, -1), (0, 1), (-1, 0), (1, 0)])
+        d = {}
+        
+        #########
+        # model parameters
+        #########
+        
+        #######
+        # Cost of gene expression
+        d['S_cost'] = 3
+        d['R_cost'] = 1
+        d['C_cost'] = 30
+        d['B_cost'] = 100  # B for Baseline, basal, "basic metabolic burden"
+
+        #####
+        # benefit from cooperation. "reward factor" in the article.
+        d['benefit'] = 0.9
+
+        ######
+        # mutation per generation
+        d['mutation_rate_r'] = 1e-4
+        d['mutation_rate_s'] = 1e-4
+        d['mutation_rate_c'] = 1e-4
+
+        ## neighbours effects' thresholds
+        d['S_th'] = 6
+        # quorum threshold
+        d['C_th'] = 3
+        # Cooperation threshold. Above it, public goods makes a difference.
+        
+        #####
+        # settings
+        #####
+        
+        d['data_filename'] = 'data.npz'
+        
+        d['NEIGHBOUR_REL_POS'] = sp.array([(0, -1), (0, 1), (-1, 0), (1, 0)])
 
         # Board size
-        self.N = N
-        self.cell_num = self.N ** 2
+        d['N'] = N
+        d['num_cells'] = N ** 2
 
         ## time keeping
         # number of generations the simulation will run
@@ -38,63 +71,53 @@ class game_of_strife:
         # each cell on the board was in a competition once since last
         # generation (?)
 
-        # we'll increase this by one every time two cells compete.
-        self.step_count = 0
+        #######
+        # we'll increase step_count by one every time two cells compete.
+        d['step_count'] = 0
 
-        self.generations = generations
-        self.steps_final = self.generations * self.cell_num
 
-        # number of genotypes possible
-        self.genotype_num = 8
+        d['generations'] = generations
+        d['steps_final'] = generations * d['num_cells']
 
-        # Cost of gene expression
-
-        self.S_cost = 3
-        self.R_cost = 1
-        self.C_cost = 30
-        self.B_cost = 100  # B for Baseline
-
-        # cooperation benefit, in ratio
-        self.benefit = 0.3
-
-        # mutation per generation
-        self.mutation_rate = 1e-4
-
-        # radius
-        self.S_rad = 1
-        self.C_rad = 1
+        #######
+        # radius of Signal or Cooperation effects.
+        d['S_rad'] = 1
+        d['C_rad'] = 1
 
         # diameter of the convolution matrix
         diameter = lambda x: 2 * x + 1
-        self.S_len = diameter(self.S_rad)
-        self.C_len = diameter(self.C_rad)
+        d['S_len'] = diameter(d['S_rad'])
+        d['C_len'] = diameter(d['C_rad'])
 
         # the convolution matrix used to count neighbours
-        self.S_kernel = sp.ones((self.S_len, self.S_len))
-        self.C_kernel = sp.ones((self.C_len, self.C_len))
-
-        ## neighbours effects' thresholds
-        self.S_th = 6
-        # quorum threshold
-        self.C_th = 3
-        # Cooperation threshold. Above it, public goods makes a difference.
+        d['S_kernel'] = sp.ones((d['S_len'], d['S_len']))
+        d['C_kernel'] = sp.ones((d['C_len'], d['C_len']))
 
         # A cell can be Signalling and/or Receptive and/or Cooperative
-        R = sp.zeros((self.N, self.N), dtype='bool')
-        S = sp.zeros((self.N, self.N), dtype='bool')
-        C = sp.ones((self.N, self.N), dtype='bool')
-        self.B = sp.array([R, S, C])
+        R = sp.zeros((N, N), dtype='bool')
+        S = sp.zeros((N, N), dtype='bool')
+        C = sp.zeros((N, N), dtype='bool')
+        d['B'] = sp.array([R, S, C])
 
         ## data sampling
         # we will take a frequency sample some number of times per generation
-        self.steps_per_gen = self.N ** 2
-        self.samples_per_gen = 1
-        self.samples_num = self.samples_per_gen * self.generations
-        self.steps_per_sample = sp.uint32(sp.floor(1.0 * self.steps_per_gen / self.samples_per_gen))
-        self.sample_count = 0
+        d['steps_per_gen'] = N ** 2
+        d['samples_per_gen'] = 1
+        d['samples_num'] = d['samples_per_gen'] * d['generations']
+        d['steps_per_sample'] = sp.uint32(sp.floor(1.0 * d['steps_per_gen'] / d['samples_per_gen']))
+        d['sample_count'] = 0
         # We want to know the frequency of each genotype per generation
-        self.samples_frequency = sp.empty((self.samples_num, self.genotype_num), dtype='int32')
-        self.samples_nhood = sp.empty((self.samples_num, self.genotype_num, self.genotype_num))
+        d['samples_frequency'] = sp.empty((d['samples_num'], d['genotype_num']), dtype='int32')
+        d['samples_nhood'] = sp.empty((d['samples_num'], d['genotype_num'], d['genotype_num']), dtype=sp.int32)
+        
+        self.__init_unpack_parameters__(d)
+    
+    def __init_unpack_parameters__(self, d):
+        self.parameters = []
+        for key, val in d.items():
+            setattr(self, key, val)
+            self.parameters.append(key)
+            
 
     ## functions
     
@@ -138,17 +161,25 @@ class game_of_strife:
         # a cell will produce common goods if it's receptive and cooperative and signal in its neighborhood is above threshold
         # or when it's unreceptive and cooperative, with no regard to signal in its neighbourhood.
         # We'll use the C.all() == True version for the Rock Paper Sciccors version.
+
+        # TODO: Reactivate when switching back to the general simulation.        
+        # commenting the more general version of an unfixed C allele.
 #        cooping_cells = ((C_sub & R_sub) & (S_conv > self.S_th)) | (C_sub & (R_sub ^ True))
+
+        # this version assumes C is always the True allele.
         cooping_cells = (R_sub & (S_conv > self.S_th)) | (R_sub ^ True)
+        
+        
         # how many cooperators around each competitor?
-        #    print "cooping_cells"
-        #    print cooping_cells.shape
-        #    print cooping_cells
         C_conv = sp.signal.convolve2d(cooping_cells, self.C_kernel, mode='valid')
+        
+        
         # Public goods effect.
-        # G for Goods
+        # G for Goods.
+        # Which are the cells that enjoy the effect of public goods?
         G = (C_conv > self.C_th)
-        #    print "G.shape", G.shape
+        
+        
         # all cells for which the effect of goods is above threshold is True in G.
         # M for Metabolism
         # Rock Paper Scissors => C.all() == True
@@ -220,9 +251,12 @@ class game_of_strife:
         self.B[:, copy[0], copy[1]] = self.B[:, orig[0], orig[1]]
 
     def mutate(self, pos):
-        if sp.rand() < self.mutation_rate:
-            loci = sp.random.randint(1,3) # We will only mutate S and R, never C. C stays uppercase.
-            self.B[loci, pos[0], pos[1]] = self.B[loci, pos[0], pos[1]] ^ True
+        if sp.rand() < self.mutation_rate_r:
+            self.B[0, pos[0], pos[1]] = self.B[0, pos[0], pos[1]] ^ True
+        if sp.rand() < self.mutation_rate_s:
+            self.B[1, pos[0], pos[1]] = self.B[1, pos[0], pos[1]] ^ True
+        if sp.rand() < self.mutation_rate_c:
+            self.B[2, pos[0], pos[1]] = self.B[2, pos[0], pos[1]] ^ True
 
     def diffuse(self):
         m, n = sp.random.randint(self.N, size=2)
@@ -231,21 +265,19 @@ class game_of_strife:
             self.B[:, (m, m, m1, m1), (n, n1, n1, n)] = self.B[:, (m1, m, m, m1), (n, n, n1, n1)]
         else:
             self.B[:, (m, m, m1, m1), (n, n1, n1, n)] = self.B[:, (m1, m, m, m1), (n, n, n1, n1)]
+        
+    def savestrife(self, fname=None):
+        fname = fname if fname else self.data_filename
+        ff = {}
+        for key in self.parameters:
+            ff[key] = getattr(self, key)
+        sp.savez(fname, ff)
     
-    def save(self, f):
-        pass
-
-#    def diffuse(self):
-#        m, n = sp.random.randint(self.N, size=2)
-#        m1, n1 = (m + 1) % self.N, (n + 1) % self.N
-#        if sp.random.rand()<0.5:
-#            # Truth for clockwise
-#            for board in [self.R, self.S, self.C]:
-#                board[(m, m, m1, m1), (n, n1, n1, n)] = board[(m1, m, m, m1), (n, n, n1, n1)]
-#        else:
-#            for board in [self.R, self.S, self.C]:
-#                board[(m, m, m1, m1), (n, n1, n1, n)] = board[(m, m1, m1, m), (n1, n1, n, n)]
-
+    def loadstrife(self, fname=None):
+        fname = fname if fname else self.data_filename
+        ff = sp.load(fname)['arr_0'].tolist()
+        self.__init_unpack_parameters__(ff)
+    
     def sample(self):
         joint_board = self.B[0] + 2 * self.B[1] + 4 * self.B[2]
         for genotype in range(8):
@@ -255,7 +287,7 @@ class game_of_strife:
             for nh_genotype in range(8):
                 nh_board = joint_board == nh_genotype
                 nh_genotype_count = sp.signal.convolve2d(nh_board, sp.ones((3,3)), mode='same', boundary='wrap')
-                nh_genotype_count_of_genotype = sp.sum(nh_genotype_count * genotype_board)
+                nh_genotype_count_of_genotype = sp.sum(nh_genotype_count * genotype_board, dtype=sp.int32)
                 self.samples_nhood[self.sample_count, genotype, nh_genotype] = nh_genotype_count_of_genotype
             self.samples_frequency[self.sample_count, genotype] = genotype_frequency
         self.sample_count += 1
@@ -298,95 +330,31 @@ class game_of_strife:
 
 #clock = pygame.time.Clock()
 
-def picklize(a):
-    f = open('strife_in_a_jar.pk', 'wb')
-    pickle.dump(a, f, pickle.HIGHEST_PROTOCOL)
-    f.close()
-
 def go(a):
     t = time.time()
-    every = 900
-    print t, a.step_count, "yo"
+    every = 1800
+    print "t: %(t)f, steps thus far: %(steps)d" % {'t': t, 'steps': a.step_count}
     steps_0 = a.step_count
     while a.step_count < a.steps_final:
         a.nextstep()
         delta_t = time.time() - t
         if delta_t > every:
             t = time.time()
-            savestrife(a, 'data.npz')
+            a.savestrife()
             steps_delta = a.step_count - steps_0
             steps_0 = a.step_count
-            print t, 1.0 * delta_t / steps_delta * (a.steps_final - a.step_count)
-            print t, a.step_count, steps_delta
-
-def loadstrife(a, fname='data.npz'):
-    ff = sp.load(fname)
-    ff = ff['arr_0']
-    ff = ff.item()
-    
-    a=game_of_strife()
-    for key, val in ff.items():
-        a.__setattribute(key, val)
-    return a
-
-def savestrife(a, fname='data.npz'):
-    ff = {}
-    ff['N'] = a.N
-    ff['cell_num'] = a.cell_num
-    ff['step_count'] = a.step_count
-    ff['generations'] = a.generations
-    ff['steps_final'] = a.steps_final
-    ff['genotype_num'] = a.genotype_num
-    ff['S_cost'] = a.S_cost
-    ff['R_cost'] = a.R_cost
-    ff['C_cost'] = a.C_cost
-    ff['B_cost'] = a.B_cost
-    ff['benefit'] = a.benefit
-    ff['mutation_rate'] = a.mutation_rate
-    ff['S_rad'] = a.S_rad
-    ff['C_rad'] = a.C_rad
-    ff['S_len'] = a.S_len
-    ff['C_len'] = a.C_len
-    ff['S_kernel'] = a.S_kernel
-    ff['C_kernel'] = a.C_kernel
-    ff['S_th'] = a.S_th
-    ff['C_th'] = a.C_th
-    ff['B'] = a.B
-    ff['steps_per_gen'] = a.steps_per_gen
-    ff['samples_per_gen'] = a.samples_per_gen
-    ff['samples_num'] = a.samples_num
-    ff['steps_per_sample'] = a.steps_per_sample
-    ff['sample_count'] = a.sample_count
-    ff['samples_frequency'] = a.samples_frequency
-    ff['samples_nhood'] = a.samples_nhood
-    sp.savez(fname, ff)
+            eta = 1.0 * delta_t / steps_delta * (a.steps_final - a.step_count)
+            print "t: %(t)f, approx. time to fin: %(eta)f" % {'t': t, 'eta': eta}
+            print "steps taken = %(step_count)s, steps since last save = %(steps_delta)s" % {'step_count': a.step_count, 'steps_delta': steps_delta}
+            sys.exit(1)
 
 if __name__ == '__main__':
-    fname = r'data.npz'
-    if os.path.exists(fname):
-        a = loadstrife(fname)
+    a = game_of_strife(N=10, generations=1)
+    if os.path.exists(a.data_filename):
+        a.loadstrife()
         go(a)
     else:
         a = game_of_strife(N=300, generations=10000)
         go(a)
-    
-    a = game_of_strife(N=20, generations=100)
-    go(a)
-    print a.B
-    print a.samples_nhood
-    for genotype in range(8):
-        pl.plot(a.samples_nhood[:, genotype, :])
-    pl.show()
-    pl.plot(a.samples_frequency)
-    pl.show()
-
-        
-    #    imagify_data()
-    #    update_display()
-    #    print while_count
-#    t = sp.arange(a.samples_num)
-#    print t, a.samples_frequency
-#    pl.hold(True)
-#    pl.plot(t, a.samples_frequency)
-#    pl.savefig('test.png')
-#    raw_input('Cool, eh?')
+    a.savestrife()
+    sys.exit(0)
