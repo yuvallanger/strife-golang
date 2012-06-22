@@ -29,38 +29,36 @@ class game_of_strife:
         
         #######
         # Cost of gene expression
-        d['S_cost'] = 3
-        d['R_cost'] = 1
-        d['C_cost'] = 30
-        d['B_cost'] = 100  # B for Baseline, basal, "basic metabolic burden"
+        d['S_cost'] = sp.array(3)
+        d['R_cost'] = sp.array(1)
+        d['C_cost'] = sp.array(30)
+        d['B_cost'] = sp.array(100)  # B for Baseline, basal, "basic metabolic burden"
 
         #####
         # benefit from cooperation. "reward factor" in the article.
-        d['benefit'] = 0.9
+        d['benefit'] = sp.array(0.9)
 
         ######
         # mutation per generation
-        d['mutation_rate_r'] = 1e-4
-        d['mutation_rate_s'] = 1e-4
-        d['mutation_rate_c'] = 1e-4
+        d['mutation_rate_r'] = sp.array(1e-4)
+        d['mutation_rate_s'] = sp.array(1e-4)
+        d['mutation_rate_c'] = sp.array(1e-4)
 
         ## neighbours effects' thresholds
-        d['S_th'] = 6
+        d['S_th'] = sp.array(6)
         # quorum threshold
-        d['C_th'] = 3
+        d['C_th'] = sp.array(3)
         # Cooperation threshold. Above it, public goods makes a difference.
         
         #####
         # settings
         #####
         
-        d['data_filename'] = 'data.npz'
-        
         d['NEIGHBOUR_REL_POS'] = sp.array([(0, -1), (0, 1), (-1, 0), (1, 0)])
 
         # Board size
-        d['N'] = N
-        d['num_cells'] = N ** 2
+        d['N'] = sp.array(N)
+        d['num_cells'] = sp.array(N ** 2)
 
         ## time keeping
         # number of generations the simulation will run
@@ -70,19 +68,19 @@ class game_of_strife:
 
         #######
         # we'll increase step_count by one every time two cells compete.
-        d['step_count'] = 0
+        d['step_count'] = sp.array(0)
 
 
-        d['generations'] = generations
-        d['steps_final'] = generations * d['num_cells']
+        d['generations'] = sp.array(generations)
+        d['steps_final'] = sp.array(generations * d['num_cells'])
 
         #######
         # radius of Signal or Cooperation effects.
-        d['S_rad'] = 1
-        d['C_rad'] = 1
+        d['S_rad'] = sp.array(1)
+        d['C_rad'] = sp.array(1)
 
         # diameter of the convolution matrix
-        diameter = lambda x: 2 * x + 1
+        diameter = lambda x: sp.array(2 * x + 1)
         d['S_len'] = diameter(d['S_rad'])
         d['C_len'] = diameter(d['C_rad'])
 
@@ -95,14 +93,16 @@ class game_of_strife:
         S = sp.zeros((N, N), dtype='bool')
         C = sp.zeros((N, N), dtype='bool')
         d['B'] = sp.array([R, S, C])
-
+        
+        d['genotype_num'] = sp.array(8)
+        
         ## data sampling
         # we will take a frequency sample some number of times per generation
-        d['steps_per_gen'] = N ** 2
-        d['samples_per_gen'] = 1
-        d['samples_num'] = d['samples_per_gen'] * d['generations']
-        d['steps_per_sample'] = sp.uint32(sp.floor(1.0 * d['steps_per_gen'] / d['samples_per_gen']))
-        d['sample_count'] = 0
+        d['steps_per_gen'] = sp.array(N ** 2)
+        d['samples_per_gen'] = sp.array(1)
+        d['samples_num'] = sp.array(d['samples_per_gen'] * d['generations'])
+        d['steps_per_sample'] = sp.array(sp.floor(1.0 * d['steps_per_gen'] / d['samples_per_gen']), dtype=sp.uint32)
+        d['sample_count'] = sp.array(0)
         # We want to know the frequency of each genotype per generation
         d['samples_frequency'] = sp.empty((d['samples_num'], d['genotype_num']), dtype='int32')
         d['samples_nhood'] = sp.empty((d['samples_num'], d['genotype_num'], d['genotype_num']), dtype=sp.int32)
@@ -110,10 +110,10 @@ class game_of_strife:
         self.__init_unpack_parameters__(d)
     
     def __init_unpack_parameters__(self, d):
-        self.parameters = []
+        self.parameters = set()
         for key, val in d.items():
             setattr(self, key, val)
-            self.parameters.append(key)
+            self.parameters.add(key)
             
 
     ## functions
@@ -263,17 +263,19 @@ class game_of_strife:
         else:
             self.B[:, (m, m, m1, m1), (n, n1, n1, n)] = self.B[:, (m1, m, m, m1), (n, n, n1, n1)]
         
-    def savestrife(self, fname=None):
-        fname = fname if fname else self.data_filename
-        ff = {}
-        for key in self.parameters:
-            ff[key] = getattr(self, key)
-        sp.savez(fname, ff)
+    def save_h5(self, fname):
+        with h5py.File(fname) as ff:
+            for key in self.parameters:
+                try:
+                    print key, type(getattr(self, key))
+                    ff[key] = getattr(self, key)
+                except:
+                    ff[key][...] = getattr(self, key)
     
-    def loadstrife(self, fname=None):
-        fname = fname if fname else self.data_filename
-        ff = sp.load(fname)['arr_0'].tolist()
-        self.__init_unpack_parameters__(ff)
+    def load_h5(self, fname):
+        with h5py.File(fname) as ff:
+            d = { key : val[...] for key, val in ff.items() }
+            self.__init_unpack_parameters__(d)
     
     def sample(self):
         joint_board = self.B[0] + 2 * self.B[1] + 4 * self.B[2]
@@ -291,9 +293,9 @@ class game_of_strife:
 
     def nextstep(self):
         self.competition()
-#        self.diffuse()
+        self.diffuse()
         if not self.step_count % self.steps_per_sample: self.sample()
-        #print self.step_count
+        print self.step_count
         self.step_count += 1
 
     ## process data
@@ -329,29 +331,36 @@ class game_of_strife:
 
 def go(a):
     t = time.time()
-    every = 1800
+    every = 10
     print "t: %(t)f, steps thus far: %(steps)d" % {'t': t, 'steps': a.step_count}
     steps_0 = a.step_count
     while a.step_count < a.steps_final:
+        print a.step_count
         a.nextstep()
         delta_t = time.time() - t
         if delta_t > every:
             t = time.time()
-            a.savestrife()
+            a.save_h5(fname)
             steps_delta = a.step_count - steps_0
             steps_0 = a.step_count
             eta = 1.0 * delta_t / steps_delta * (a.steps_final - a.step_count)
             print "t: %(t)f, approx. time to fin: %(eta)f" % {'t': t, 'eta': eta}
             print "steps taken = %(step_count)s, steps since last save = %(steps_delta)s" % {'step_count': a.step_count, 'steps_delta': steps_delta}
-            sys.exit(1)
+            #sys.exit(1)
 
 if __name__ == '__main__':
+    try:
+        fname = sys.argv[1]
+    except IndexError as e:
+        print "Usage: %(me)s [datafilename]" % { 'me' : sys.argv[0] }
+        raise
     a = game_of_strife(N=10, generations=1)
-    if os.path.exists(a.data_filename):
-        a.loadstrife()
+    if os.path.exists(fname):
+        a.load_h5(fname)
         go(a)
     else:
-        a = game_of_strife(N=300, generations=10000)
+        a = game_of_strife(N=100, generations=10000)
+        a.save_h5(fname)
         go(a)
-    a.savestrife()
+    a.save_h5(fname)
     sys.exit(0)
