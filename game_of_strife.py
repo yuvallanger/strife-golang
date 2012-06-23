@@ -50,6 +50,9 @@ class game_of_strife:
         d['C_th'] = sp.array(3)
         # Cooperation threshold. Above it, public goods makes a difference.
         
+        ## Probability of each single diffusion operation
+        d['D'] = 0.2
+        
         #####
         # settings
         #####
@@ -154,13 +157,10 @@ class game_of_strife:
 
         # a cell will produce common goods if the signal in its neighborhood, that is compatible with its receptor, is above threshold.
 
-        # TODO: Reactivate when switching back to the general simulation.        
-        # commenting the more general version of an unfixed C allele.
-#        cooping_cells = ((C_sub & R_sub) & (S_conv > self.S_th)) | (C_sub & (R_sub ^ True))
-
-        # 
-        type_1_cooping = (R_sub ^ True) & ((S_conv > self.S_th) ^ True)
-        type_2_cooping = R_sub & (S_conv > self.S_th)
+        # R1 & (S1 > Sth) or  R2 & (S2 > Sth)
+        type_2_above_threshold = S_conv > self.S_th
+        type_2_cooping = R_sub & type_2_above_threshold
+        type_1_cooping =  (R_sub | type_2_above_threshold) ^ True
         cooping_cells = type_1_cooping | type_2_cooping
         
         
@@ -181,8 +181,7 @@ class game_of_strife:
         twocellrange_c = sp.arange(cl, ch + 1)
         R_cost_board = self.R_cost * self.B[0, twocellpos_r, twocellpos_c]
         S_cost_board = self.S_cost * self.B[1, twocellpos_r, twocellpos_c]
-        C_cost_board = self.C_cost * sp.array([True, True], dtype='bool')
-        Total_cost_board = S_cost_board + R_cost_board + C_cost_board + self.B_cost
+        Total_cost_board = S_cost_board + R_cost_board + self.C_cost + self.B_cost
         M = G * (1 - self.benefit) * Total_cost_board
         # all false in G don't benefit from public goods (G^True flips values)
         M += (G^True) *  Total_cost_board
@@ -290,7 +289,8 @@ class game_of_strife:
 
     def nextstep(self):
         self.competition()
-        self.diffuse()
+        for i in range(sp.floor(self.N ** 2 * self.D):
+            self.diffuse()
         if not self.step_count % self.steps_per_sample: self.sample()
         print self.step_count
         self.step_count += 1
