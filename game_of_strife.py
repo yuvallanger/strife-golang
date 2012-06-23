@@ -88,8 +88,7 @@ class game_of_strife:
         d['S_kernel'] = sp.ones((d['S_len'], d['S_len']))
         d['C_kernel'] = sp.ones((d['C_len'], d['C_len']))
 
-        # A cell can be either R1 or R2 and either S1 or S2.
-        # False for 1 and True for 2.
+        # A cell can be Signalling and/or Receptive and/or Cooperative
         R = sp.zeros((N, N), dtype='bool')
         S = sp.zeros((N, N), dtype='bool')
         d['B'] = sp.array([R, S])
@@ -115,10 +114,10 @@ class game_of_strife:
             setattr(self, key, val)
             self.parameters.add(key)
             
-
+    ######
     ## functions
+    ######    
     
-#    @profile
     def competition(self):
         ##
         # Draw two adjacent positions.
@@ -149,32 +148,30 @@ class game_of_strife:
 
         R_sub = self.B[0, rc_row_range, :][:, rc_col_range]
         S_sub = self.B[1, s_row_range, :][:, s_col_range]
-        C_sub = sp.ones((2 * self.C_rad + sp.absolute(rl-rh), 2 * self.C_rad + sp.absolute(cl-ch)), dtype='bool')
 
         # we count how many signallers are within each cell's neighbourhood
-        #print S_sub.shape
         S_conv = sp.signal.convolve2d(S_sub, self.S_kernel, mode='valid')
 
-        # a cell will produce common goods if it's receptive and cooperative and signal in its neighborhood is above threshold
-        # or when it's unreceptive and cooperative, with no regard to signal in its neighbourhood.
-        # We'll use the C.all() == True version for the Rock Paper Sciccors version.
+        # a cell will produce common goods if the signal in its neighborhood, that is compatible with its receptor, is above threshold.
 
         # TODO: Reactivate when switching back to the general simulation.        
         # commenting the more general version of an unfixed C allele.
 #        cooping_cells = ((C_sub & R_sub) & (S_conv > self.S_th)) | (C_sub & (R_sub ^ True))
 
-        # this version assumes C is always the True allele.
-        cooping_cells = (R_sub & (S_conv > self.S_th)) | (R_sub ^ True)
+        # 
+        type_1_cooping = (R_sub ^ True) & ((S_conv > self.S_th) ^ True)
+        type_2_cooping = R_sub & (S_conv > self.S_th)
+        cooping_cells = type_1_cooping | type_2_cooping
         
         
-        # how many cooperators around each competitor?
-        C_conv = sp.signal.convolve2d(cooping_cells, self.C_kernel, mode='valid')
+#        # how many cooperators around each competitor?
+#        C_conv = sp.signal.convolve2d(cooping_cells, self.C_kernel, mode='valid')
         
         
         # Public goods effect.
         # G for Goods.
         # Which are the cells that enjoy the effect of public goods?
-        G = (C_conv > self.C_th)
+        G = (cooping_cells > self.C_th)
         
         
         # all cells for which the effect of goods is above threshold is True in G.
