@@ -88,13 +88,13 @@ class game_of_strife:
         d['S_kernel'] = sp.ones((d['S_len'], d['S_len']))
         d['C_kernel'] = sp.ones((d['C_len'], d['C_len']))
 
-        # A cell can be Signalling and/or Receptive and/or Cooperative
+        # A cell can be either R1 or R2 and either S1 or S2.
+        # False for 1 and True for 2.
         R = sp.zeros((N, N), dtype='bool')
         S = sp.zeros((N, N), dtype='bool')
-        C = sp.zeros((N, N), dtype='bool')
-        d['B'] = sp.array([R, S, C])
+        d['B'] = sp.array([R, S])
         
-        d['genotype_num'] = sp.array(8)
+        d['genotype_num'] = sp.array(4)
         
         ## data sampling
         # we will take a frequency sample some number of times per generation
