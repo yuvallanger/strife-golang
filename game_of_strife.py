@@ -51,7 +51,7 @@ class game_of_strife:
         # Cooperation threshold. Above it, public goods makes a difference.
         
         ## Probability of each single diffusion operation
-        d['D'] = 0.2
+        d['D'] = sp.array(0.0)
         
         #####
         # settings
@@ -94,20 +94,24 @@ class game_of_strife:
         # A cell can be Signalling and/or Receptive and/or Cooperative
         R = sp.zeros((N, N), dtype='bool')
         S = sp.zeros((N, N), dtype='bool')
-        d['B'] = sp.array([R, S])
+        C = sp.zeros((N, N), dtype='bool')
+        d['B'] = sp.array([R, S, C])
         
-        d['genotype_num'] = sp.array(4)
+        d['genotype_num'] = sp.array(8)
         
         ## data sampling
         # we will take a frequency sample some number of times per generation
         d['steps_per_gen'] = sp.array(N ** 2)
         d['samples_per_gen'] = sp.array(1)
         d['samples_num'] = sp.array(d['samples_per_gen'] * d['generations'])
+        d['samples_board_num'] =sp.array(d['samples_num'] / 10)
         d['steps_per_sample'] = sp.array(sp.floor(1.0 * d['steps_per_gen'] / d['samples_per_gen']), dtype=sp.uint32)
+        d['steps_per_board_sample'] = sp.array(10 * d['steps_per_sample'])
         d['sample_count'] = sp.array(0)
         # We want to know the frequency of each genotype per generation
         d['samples_frequency'] = sp.empty((d['samples_num'], d['genotype_num']), dtype='int32')
         d['samples_nhood'] = sp.empty((d['samples_num'], d['genotype_num'], d['genotype_num']), dtype=sp.int32)
+        d['samples_board'] = sp.empty((d['samples_board_num'], 3, N, N), dtype=sp.int32)
         
         self.__init_unpack_parameters__(d)
     
@@ -151,37 +155,40 @@ class game_of_strife:
 
         R_sub = self.B[0, rc_row_range, :][:, rc_col_range]
         S_sub = self.B[1, s_row_range, :][:, s_col_range]
+        C_sub = self.B[2, rc_row_range, :][:, rc_col_range]
 
         # we count how many signallers are within each cell's neighbourhood
         S_conv = sp.signal.convolve2d(S_sub, self.S_kernel, mode='valid')
 
-        # a cell will produce common goods if the signal in its neighborhood, that is compatible with its receptor, is above threshold.
+        # a cell will produce common goods if it's cooperative and the signal in its neighborhood, that is compatible with its receptor, is above threshold.
 
-        # R1 & (S1 > Sth) or  R2 & (S2 > Sth)
+        # C and (R1 and (S1 > Sth) or  R2 and (S2 > Sth))
         type_2_above_threshold = S_conv > self.S_th
         type_2_cooping = R_sub & type_2_above_threshold
         type_1_cooping =  (R_sub | type_2_above_threshold) ^ True
-        cooping_cells = type_1_cooping | type_2_cooping
+        cooping_cells = C_sub & (type_1_cooping | type_2_cooping)
         
         
-#        # how many cooperators around each competitor?
-#        C_conv = sp.signal.convolve2d(cooping_cells, self.C_kernel, mode='valid')
+        # how many cooperators around each competitor?
+        C_conv = sp.signal.convolve2d(cooping_cells, self.C_kernel, mode='valid')
         
         
         # Public goods effect.
         # G for Goods.
         # Which are the cells that enjoy the effect of public goods?
-        G = (cooping_cells > self.C_th)
+        G = (C_conv > self.C_th)
         
         
         # all cells for which the effect of goods is above threshold is True in G.
         # M for Metabolism
-        # Rock Paper Scissors => C.all() == True
         twocellpos_r, twocellpos_c = sp.arange(rl, rh + 1) % self.N, sp.arange(cl, ch + 1) % self.N
-        twocellrange_c = sp.arange(cl, ch + 1)
-        R_cost_board = self.R_cost * self.B[0, twocellpos_r, twocellpos_c]
-        S_cost_board = self.S_cost * self.B[1, twocellpos_r, twocellpos_c]
-        Total_cost_board = S_cost_board + R_cost_board + self.C_cost + self.B_cost
+		####
+		# no need for R and S cost boards because both alleles (1 and 2) of each loci (R and S) take equal resources
+		####
+#        R_cost_board = self.R_cost * self.B[0, twocellpos_r, twocellpos_c]
+#        S_cost_board = self.S_cost * self.B[1, twocellpos_r, twocellpos_c]
+        C_cost_board = self.C_cost * self.B[2, twocellpos_r, twpcellpos_c]
+        Total_cost_board = C_cost_board + self.R_cost + self.S_cost + self.B_cost
         M = G * (1 - self.benefit) * Total_cost_board
         # all false in G don't benefit from public goods (G^True flips values)
         M += (G^True) *  Total_cost_board
@@ -289,10 +296,13 @@ class game_of_strife:
 
     def nextstep(self):
         self.competition()
-        for i in range(sp.floor(self.N ** 2 * self.D):
+        for i in range(sp.int32(self.N ** 2 * self.D)):
             self.diffuse()
-        if not self.step_count % self.steps_per_sample: self.sample()
-        print self.step_count
+        if not self.step_count % self.steps_per_sample:
+            self.sample()
+        if not self.step_count % self.steps_per_board_sample:
+            board_sample_num = self.step_count / self.steps_per_board_sample
+            self.samples_board[board_sample_num] = self.B
         self.step_count += 1
 
     ## process data
@@ -328,19 +338,18 @@ class game_of_strife:
 
 def go(a):
     t = time.time()
-    every = 10
+    every = 30*60
     print "t: %(t)f, steps thus far: %(steps)d" % {'t': t, 'steps': a.step_count}
-    steps_0 = a.step_count
-    while a.step_count < a.steps_final:
-        print a.step_count
+    steps_a = a.step_count
+    while a.step_count <= a.steps_final:
         a.nextstep()
         delta_t = time.time() - t
         if delta_t > every:
             t = time.time()
             a.save_h5(fname)
-            steps_delta = a.step_count - steps_0
-            steps_0 = a.step_count
-            eta = 1.0 * delta_t / steps_delta * (a.steps_final - a.step_count)
+            steps_delta = a.step_count - steps_a
+            steps_a = a.step_count
+            eta = 1.0 * delta_t / (steps_delta+1) * (a.steps_final - a.step_count)
             print "t: %(t)f, approx. time to fin: %(eta)f" % {'t': t, 'eta': eta}
             print "steps taken = %(step_count)s, steps since last save = %(steps_delta)s" % {'step_count': a.step_count, 'steps_delta': steps_delta}
             sys.exit(1)
