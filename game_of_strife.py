@@ -10,48 +10,54 @@ import os
 import time
 import scipy as sp
 import scipy.signal
+import scipy.weave
 #import pygame
 import pylab as pl
 #import timeit
 import sys
+import signal
 
 labels = ['Ignorant (csr)', 'Voyeur (csR)', 'Liar (cSr)', 'Lame (cSR)',
           'Blunt (Csr)', 'Shy (CsR)', 'Vain (CSr)', 'Honest (CSR)']
 
 class game_of_strife:
-    def __init__(self, N=10, generations=1):
+    def __init__(self, fname, N=10, generations=1):
         
         d = {}
         
+        ########
+        # filname
+        d['fname'] = fname
+
         #########
         # model parameters
         #########
         
         #######
         # Cost of gene expression
-        d['S_cost'] = sp.array(3)
-        d['R_cost'] = sp.array(1)
-        d['C_cost'] = sp.array(30)
-        d['B_cost'] = sp.array(100)  # B for Baseline, basal, "basic metabolic burden"
+        d['S_cost'] = sp.uint64(3)
+        d['R_cost'] = sp.uint64(1)
+        d['C_cost'] = sp.uint64(30)
+        d['B_cost'] = sp.uint64(100)  # B for Baseline, basal, "basic metabolic burden"
 
         #####
         # benefit from cooperation. "reward factor" in the article.
-        d['benefit'] = sp.array(0.9)
+        d['benefit'] = sp.float64(0.9)
 
         ######
         # mutation per generation
-        d['mutation_rate_r'] = sp.array(1e-4)
-        d['mutation_rate_s'] = sp.array(1e-4)
-        d['mutation_rate_c'] = sp.array(1e-4)
+        d['mutation_rate_r'] = sp.float64(1e-4)
+        d['mutation_rate_s'] = sp.float64(1e-4)
+        d['mutation_rate_c'] = sp.float64(1e-4)
 
         ## neighbours effects' thresholds
-        d['S_th'] = sp.array(6)
+        d['S_th'] = sp.uint64(3)
         # quorum threshold
-        d['C_th'] = sp.array(3)
+        d['C_th'] = sp.uint64(3)
         # Cooperation threshold. Above it, public goods makes a difference.
         
         ## Probability of each single diffusion operation
-        d['D'] = sp.array(0.0)
+        d['D'] = sp.float64(0.5)
         
         #####
         # settings
@@ -60,8 +66,8 @@ class game_of_strife:
         d['NEIGHBOUR_REL_POS'] = sp.array([(0, -1), (0, 1), (-1, 0), (1, 0)])
 
         # Board size
-        d['N'] = sp.array(N)
-        d['num_cells'] = sp.array(N ** 2)
+        d['N'] = N
+        d['num_cells'] = sp.uint64(N ** 2)
 
         ## time keeping
         # number of generations the simulation will run
@@ -71,19 +77,19 @@ class game_of_strife:
 
         #######
         # we'll increase step_count by one every time two cells compete.
-        d['step_count'] = sp.array(0)
+        d['step_count'] = sp.uint64(0)
 
 
-        d['generations'] = sp.array(generations)
-        d['steps_final'] = sp.array(generations * d['num_cells'])
+        d['generations'] = sp.uint64(generations)
+        d['steps_final'] = sp.uint64(generations * d['num_cells'])
 
         #######
         # radius of Signal or Cooperation effects.
-        d['S_rad'] = sp.array(1)
-        d['C_rad'] = sp.array(1)
+        d['S_rad'] = sp.uint64(1)
+        d['C_rad'] = sp.uint64(1)
 
         # diameter of the convolution matrix
-        diameter = lambda x: sp.array(2 * x + 1)
+        diameter = lambda x: sp.uint64(2 * x + 1)
         d['S_len'] = diameter(d['S_rad'])
         d['C_len'] = diameter(d['C_rad'])
 
@@ -92,26 +98,26 @@ class game_of_strife:
         d['C_kernel'] = sp.ones((d['C_len'], d['C_len']))
 
         # A cell can be Signalling and/or Receptive and/or Cooperative
-        R = sp.zeros((N, N), dtype='bool')
-        S = sp.zeros((N, N), dtype='bool')
-        C = sp.zeros((N, N), dtype='bool')
+        R = sp.rand(N, N) > 0.5
+        S = sp.rand(N, N) > 0.5
+        C = sp.rand(N, N) > 0.5
         d['B'] = sp.array([R, S, C])
         
-        d['genotype_num'] = sp.array(8)
+        d['genotype_num'] = sp.uint64(8)
         
         ## data sampling
         # we will take a frequency sample some number of times per generation
-        d['steps_per_gen'] = sp.array(N ** 2)
-        d['samples_per_gen'] = sp.array(1)
-        d['samples_num'] = sp.array(d['samples_per_gen'] * d['generations'])
-        d['samples_board_num'] =sp.array(d['samples_num'] / 10)
-        d['steps_per_sample'] = sp.array(sp.floor(1.0 * d['steps_per_gen'] / d['samples_per_gen']), dtype=sp.uint32)
-        d['steps_per_board_sample'] = sp.array(10 * d['steps_per_sample'])
-        d['sample_count'] = sp.array(0)
+        d['steps_per_gen'] = sp.uint64(N ** 2)
+        d['samples_per_gen'] = sp.uint64(1)
+        d['samples_num'] = sp.uint64(d['samples_per_gen'] * d['generations'])
+        d['samples_board_num'] =sp.uint64(d['samples_num'] / 10)
+        d['steps_per_sample'] = sp.uint64(sp.floor(1.0 * d['steps_per_gen'] / d['samples_per_gen']), dtype=sp.uint64)
+        d['steps_per_board_sample'] = sp.uint64(10 * d['steps_per_sample'])
+        d['sample_count'] = sp.uint64(0)
         # We want to know the frequency of each genotype per generation
         d['samples_frequency'] = sp.empty((d['samples_num'], d['genotype_num']), dtype='int32')
-        d['samples_nhood'] = sp.empty((d['samples_num'], d['genotype_num'], d['genotype_num']), dtype=sp.int32)
-        d['samples_board'] = sp.empty((d['samples_board_num'], 3, N, N), dtype=sp.int32)
+        d['samples_nhood'] = sp.empty((d['samples_num'], d['genotype_num'], d['genotype_num']), dtype=sp.uint64)
+        d['samples_board'] = sp.empty((d['samples_board_num'], 3, N, N), dtype=sp.uint64)
         
         self.__init_unpack_parameters__(d)
     
@@ -125,6 +131,7 @@ class game_of_strife:
     ## functions
     ######    
     
+#    @profile
     def competition(self):
         ##
         # Draw two adjacent positions.
@@ -160,15 +167,13 @@ class game_of_strife:
         # we count how many signallers are within each cell's neighbourhood
         S_conv = sp.signal.convolve2d(S_sub, self.S_kernel, mode='valid')
 
-        # a cell will produce common goods if it's cooperative and the signal in its neighborhood, that is compatible with its receptor, is above threshold.
+        # a cell will produce common goods if it's receptive and cooperative and signal in its neighborhood is above threshold
+        # or when it's unreceptive and cooperative, with no regard to signal in its neighbourhood.
+        cooping_cells = ((C_sub & R_sub) & (S_conv >= self.S_th)) | (C_sub & (R_sub ^ True))
+        
+        # ATTENTION: only works with C_len == 3, C_kernel.shape == (3, 3).
+        cooping_competitors = cooping_cells[1, 1:3] if cooping_cells.shape else cooping_cells[2:4, 1]
 
-        # C and (R1 and (S1 > Sth) or  R2 and (S2 > Sth))
-        type_2_above_threshold = S_conv > self.S_th
-        type_2_cooping = R_sub & type_2_above_threshold
-        type_1_cooping =  (R_sub | type_2_above_threshold) ^ True
-        cooping_cells = C_sub & (type_1_cooping | type_2_cooping)
-        
-        
         # how many cooperators around each competitor?
         C_conv = sp.signal.convolve2d(cooping_cells, self.C_kernel, mode='valid')
         
@@ -176,19 +181,16 @@ class game_of_strife:
         # Public goods effect.
         # G for Goods.
         # Which are the cells that enjoy the effect of public goods?
-        G = (C_conv > self.C_th)
+        G = (C_conv >= self.C_th)
         
         
         # all cells for which the effect of goods is above threshold is True in G.
         # M for Metabolism
         twocellpos_r, twocellpos_c = sp.arange(rl, rh + 1) % self.N, sp.arange(cl, ch + 1) % self.N
-		####
-		# no need for R and S cost boards because both alleles (1 and 2) of each loci (R and S) take equal resources
-		####
-#        R_cost_board = self.R_cost * self.B[0, twocellpos_r, twocellpos_c]
-#        S_cost_board = self.S_cost * self.B[1, twocellpos_r, twocellpos_c]
-        C_cost_board = self.C_cost * self.B[2, twocellpos_r, twpcellpos_c]
-        Total_cost_board = C_cost_board + self.R_cost + self.S_cost + self.B_cost
+        R_cost_board = self.R_cost * self.B[0, twocellpos_r, twocellpos_c]
+        S_cost_board = self.S_cost * self.B[1, twocellpos_r, twocellpos_c]
+        C_cost_board = self.C_cost * cooping_competitors
+        Total_cost_board = S_cost_board + R_cost_board + C_cost_board + self.B_cost
         M = G * (1 - self.benefit) * Total_cost_board
         # all false in G don't benefit from public goods (G^True flips values)
         M += (G^True) *  Total_cost_board
@@ -259,15 +261,83 @@ class game_of_strife:
             self.B[2, pos[0], pos[1]] = self.B[2, pos[0], pos[1]] ^ True
 
     def diffuse(self):
-        m, n = sp.random.randint(self.N, size=2)
-        m1, n1 = (m + 1) % self.N, (n + 1) % self.N
-        if sp.random.rand() < 0.5:
-            self.B[:, (m, m, m1, m1), (n, n1, n1, n)] = self.B[:, (m1, m, m, m1), (n, n, n1, n1)]
-        else:
-            self.B[:, (m, m, m1, m1), (n, n1, n1, n)] = self.B[:, (m1, m, m, m1), (n, n, n1, n1)]
+        diffuse_code = r'''
+bool tmp_values[3][2][2];
+
+long int genotype_i , row_i , col_i ;
+genotype_i = row_i = col_i = 0;
+
+for (row_i = 0; row_i < 2; row_i++)
+{
+  for (col_i = 0; col_i < 2; col_i++)
+  {
+    for (genotype_i = 0; genotype_i < 3; genotype_i++)
+    {
+      tmp_values[genotype_i][row_i % board_size][col_i % board_size] = b[genotype_i, row_i % board_size, col_i % board_size];
+    }
+  }
+}
+
+long int row1 = ((int) row + 1) % board_size;
+long int col1 = ((int) col + 1) % board_size;
+/*
+for (int i; i < 2; i++)
+{
+  for (int j; i < 2; j++)
+  {
+    for (int g; g < 3; g++)
+    {
+      printf("%d", b[g, i, j]);
+    }
+    printf(" ");
+  }
+  printf("\n");
+}
+*/
+if (d < 0.5)
+{
+  for (genotype_i = 0; genotype_i < 3; genotype_i++)
+  {
+    b[genotype_i, row , col  ] = tmp_values[genotype_i, row , col1]; // anticlockwise index map
+    b[genotype_i, row , col1 ] = tmp_values[genotype_i, row1, col1]; // 00 01  01 11
+    b[genotype_i, row1, col  ] = tmp_values[genotype_i, row , col ]; // 10 11  00 10
+    b[genotype_i, row1, col1 ] = tmp_values[genotype_i, row1, col ];
+  }
+}
+else
+{
+  for (genotype_i = 0; genotype_i < 3; genotype_i++)
+  {
+    b[genotype_i, row , col  ] = tmp_values[genotype_i, row1, col ]; // clockwise index map
+    b[genotype_i, row , col1 ] = tmp_values[genotype_i, row , col ]; // 00 01  10 00
+    b[genotype_i, row1, col  ] = tmp_values[genotype_i, row1, col1]; // 10 11  11 01
+    b[genotype_i, row1, col1 ] = tmp_values[genotype_i, row , col1];
+  }
+}
+/*
+for (int i; i < 2; i++)
+{
+  for (int j; i < 2; j++)
+  {
+    for (int g; g < 3; g++)
+    {
+      printf("%d", b[g, i, j]);
+    }
+    printf(" ");
+  }
+  printf("\n");
+}
+*/
+'''
+#        print "yo", self.D, self.N, (self.N ** 2), (self.N ** 2) * self.D, sp.uint64((self.N ** 2) * self.D)
+        for i in range(sp.uint64((self.N ** 2) * self.D / 4)):
+            direction = sp.random.rand()
+            row, col = sp.random.randint(self.N, size=2)
+#            print "diffusing:", i
+            sp.weave.inline(diffuse_code, ['board_size', 'b', 'row', 'col', 'd'], {'board_size': self.N, 'b': self.B, 'row': row, 'col': col, 'd': direction})
         
-    def save_h5(self, fname):
-        with h5py.File(fname) as ff:
+    def save_h5(self):
+        with h5py.File(self.fname) as ff:
             for key in self.parameters:
                 try:
                     print key, type(getattr(self, key))
@@ -275,8 +345,8 @@ class game_of_strife:
                 except:
                     ff[key][...] = getattr(self, key)
     
-    def load_h5(self, fname):
-        with h5py.File(fname) as ff:
+    def load_h5(self):
+        with h5py.File(self.fname) as ff:
             d = { key : val[...] for key, val in ff.items() }
             self.__init_unpack_parameters__(d)
     
@@ -289,15 +359,18 @@ class game_of_strife:
             for nh_genotype in range(8):
                 nh_board = joint_board == nh_genotype
                 nh_genotype_count = sp.signal.convolve2d(nh_board, sp.ones((3,3)), mode='same', boundary='wrap')
-                nh_genotype_count_of_genotype = sp.sum(nh_genotype_count * genotype_board, dtype=sp.int32)
+                nh_genotype_count_of_genotype = sp.sum(nh_genotype_count * genotype_board, dtype=sp.uint64)
                 self.samples_nhood[self.sample_count, genotype, nh_genotype] = nh_genotype_count_of_genotype
             self.samples_frequency[self.sample_count, genotype] = genotype_frequency
         self.sample_count += 1
 
     def nextstep(self):
-        self.competition()
-        for i in range(sp.int32(self.N ** 2 * self.D)):
-            self.diffuse()
+        print 'generation:', self.step_count
+        for i in range(self.N ** 2):
+            if i % 100 == 0:
+                print 'competition:', i
+            self.competition()
+        self.diffuse()
         if not self.step_count % self.steps_per_sample:
             self.sample()
         if not self.step_count % self.steps_per_board_sample:
@@ -317,9 +390,9 @@ class game_of_strife:
         ## package boards' data into a displayable array.
         return sp.array([self.S, self.R, self.C])
 
-#    def display_frequency_timeseries(self):
-#        for i in range(8):
-#            pl.plot(sp.arange(self.samples_num), self.samples_frequency[:,i], label=str(i), fillstyle='bottom')
+    def display_frequency_timeseries(self):
+        for i in range(8):
+            pl.plot(sp.arange(self.samples_num), self.samples_frequency[:,i], label=str(i), fillstyle='bottom')
     
 
 
@@ -337,16 +410,17 @@ class game_of_strife:
 #clock = pygame.time.Clock()
 
 def go(a):
+    signal.signal(signal.SIGINT, handler_maker(a))
     t = time.time()
     every = 30*60
     print "t: %(t)f, steps thus far: %(steps)d" % {'t': t, 'steps': a.step_count}
     steps_a = a.step_count
-    while a.step_count <= a.steps_final:
+    while a.step_count <= a.generations:
         a.nextstep()
         delta_t = time.time() - t
         if delta_t > every:
             t = time.time()
-            a.save_h5(fname)
+            a.save_h5()
             steps_delta = a.step_count - steps_a
             steps_a = a.step_count
             eta = 1.0 * delta_t / (steps_delta+1) * (a.steps_final - a.step_count)
@@ -354,19 +428,28 @@ def go(a):
             print "steps taken = %(step_count)s, steps since last save = %(steps_delta)s" % {'step_count': a.step_count, 'steps_delta': steps_delta}
             sys.exit(1)
 
+# TODO: Handler of signals.
+def handler_maker(a_game):
+    def handler(signum, frame):
+        print 'Signal handler called with signal', signum
+        a_game.save_h5()
+        print 'game saved'
+        raise
+    return handler
+
 if __name__ == '__main__':
     try:
         fname = sys.argv[1]
     except IndexError as e:
         print "Usage: %(me)s [datafilename]" % { 'me' : sys.argv[0] }
         raise
-    a = game_of_strife(N=10, generations=1)
+    a = game_of_strife(fname = fname, N=10, generations=1)
     if os.path.exists(fname):
-        a.load_h5(fname)
+        a.load_h5()
         go(a)
     else:
-        a = game_of_strife(N=100, generations=10000)
-        a.save_h5(fname)
+        a = game_of_strife(fname = fname, N=100, generations=10000)
+        a.save_h5()
         go(a)
-    a.save_h5(fname)
+    a.save_h5()
     sys.exit(0)
