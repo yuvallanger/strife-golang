@@ -23,6 +23,9 @@ labels = ['Ignorant (csr)', 'Voyeur (csR)', 'Liar (cSr)', 'Lame (cSR)',
 
 class gameOfStrife:
     def __init__(self, config=None):
+        if config == None:
+            config = default_config
+
         d = {}
 
         ########
@@ -64,7 +67,7 @@ class gameOfStrife:
         d['S_rad'] = sp.int64(config['S_rad'])
         d['C_rad'] = sp.int64(config['C_rad'])
        
-        d['generations'] = sp.int64(generations)
+        d['generations'] = sp.int64(config['generations'])
 
         d['N'] = sp.int64(config['board_size'])
       
@@ -85,7 +88,7 @@ class gameOfStrife:
         d['step_count'] = sp.int64(0)
 
 
-        d['steps_final'] = sp.int64(generations * d['N']**2)
+        d['steps_final'] = sp.int64(d['generations'] * d['N']**2)
 
         # diameter of the convolution matrix
         diameter = lambda x: sp.int64(2 * x + 1)
@@ -97,27 +100,27 @@ class gameOfStrife:
         d['C_kernel'] = sp.ones((C_len, C_len))
 
         # A cell can be Signalling and/or Receptive and/or Cooperative
-        R = sp.rand(N, N) > config['initial_receptives_amount']
-        S = sp.rand(N, N) > config['initial_signallers_amount']
-        C = sp.rand(N, N) > config['initial_cooperators_amount']
+        R = sp.rand(d['N'], d['N']) > config['initial_receptives_amount']
+        S = sp.rand(d['N'], d['N']) > config['initial_signallers_amount']
+        C = sp.rand(d['N'], d['N']) > config['initial_cooperators_amount']
         d['B'] = sp.array([R, S, C]).transpose((1,2,0))
-        assert N == d['B'].shape[0] and N == d['B'].shape[1], 'B.shape: {0}\nN: {1}\nWanted: {2}'.format(d['B'].shape, N, (N, N, 3))
+        assert d['N'] == d['B'].shape[0] and d['N'] == d['B'].shape[1], 'B.shape: {0}\nN: {1}\nWanted: {2}'.format(d['B'].shape, d['N'], (d['N'], d['N'], 3))
         
         d['genotype_num'] = sp.int64(8)
         
         ## data sampling
         # we will take a frequency sample some number of times per generation
-        d['steps_per_gen'] = sp.int64(N ** 2)
+        d['steps_per_gen'] = sp.int64(d['N'] ** 2)
         d['samples_per_gen'] = sp.int64(1)
         d['samples_num'] = sp.int64(d['samples_per_gen'] * d['generations'])
-        d['samples_board_num'] =sp.int64(d['samples_num'] / 10)
-        d['steps_per_sample'] = sp.int64(sp.floor(1.0 * d['steps_per_gen'] / d['samples_per_gen']), dtype=sp.int64)
+        d['samples_board_num'] = sp.int64(d['samples_num'] // 10)
+        d['steps_per_sample'] = sp.int64(sp.floor(1.0 * d['steps_per_gen'] // d['samples_per_gen']), dtype=sp.int64)
         d['steps_per_board_sample'] = sp.int64(10 * d['steps_per_sample'])
         d['sample_count'] = sp.int64(0)
         # We want to know the frequency of each genotype per generation
         d['samples_frequency'] = sp.empty((d['samples_num'], d['genotype_num']), dtype='int32')
         d['samples_nhood'] = sp.empty((d['samples_num'], d['genotype_num'], d['genotype_num']), dtype=sp.int64)
-        d['samples_board'] = sp.empty((d['samples_board_num'], N, N, 3), dtype=sp.int64)
+        d['samples_board'] = sp.empty((d['samples_board_num'], d['N'], d['N'], 3), dtype=sp.int64)
        
         if not config == None:
             self.__init_unpack_parameters__(d)
@@ -128,17 +131,13 @@ class gameOfStrife:
             setattr(self, key, val)
             self.parameters.add(key)
 
-    def load_config(self):
-
-            
     ######
     ## functions
     ######    
     
 #    @profile
     def competition(self, c_pos_1, c_pos_2, p_pair):
-        '''Takes two adjacent positions on the board and two uniform distribution over [0, 1). Decides which of the two positions wins.
-        '''
+        '''Takes two adjacent positions on the board and two uniform distribution over [0, 1). Decides which of the two positions wins.'''
         p1, p2 = p_pair
         assert (0 <= p1 < 1) and (0 <= p2 < 1), 'p1 ({0}) and p2 ({1}) need to be over [0, 1)'.format(p1, p2)
         # c_pos_2's coordinates in a torus:
@@ -440,7 +439,7 @@ for (int i; i < 2; i++)
             winner_pos, loser_pos = self.competition(pos1, pos2, p_pair)
             self.copycell(winner_pos, loser_pos)
             self.mutate(loser_pos)
-        for i in range(sp.int64((self.N ** 2) * self.diffusion_amount / 4)):
+        for i in range(sp.int64((self.N ** 2) * self.diffusion_amount // 4)):
             print 'diffusion: {0}'.format(i)
             direction = sp.random.rand()
             position = sp.random.randint(self.N, size=2)
@@ -448,7 +447,7 @@ for (int i; i < 2; i++)
         if not self.step_count % self.steps_per_sample:
             self.sample()
         if not self.step_count % self.steps_per_board_sample:
-            board_sample_num = self.step_count / self.steps_per_board_sample
+            board_sample_num = self.step_count // self.steps_per_board_sample
             self.samples_board[board_sample_num] = self.B
         self.step_count += 1
 
@@ -537,7 +536,8 @@ default_config = {
         'samples_per_gen': 1,
         'initial_receptives_amount': 0,
         'initial_signallers_amount': 0,
-        'initial_cooperators_amount': 0 }
+        'initial_cooperators_amount': 0,
+        'data_filename': 'strife.h5' }
 
 def load_config(config_filename):
     '''
