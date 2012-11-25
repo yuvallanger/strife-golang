@@ -536,7 +536,7 @@ default_config = {
         'board_size':        10, # The length of the board. The board will be of shape (board_size, board_size).
         'generations':       10, # Each generation involves, on average, all cells in a competition, meaning
                                  #    board_size**2 competitions.
-        'S_rad':              1,
+        'S_rad':              1, # Radius of the signal's effect.
         'C_rad':              1,
         'samples_per_gen':    1,
         'initial_receptives_amount': 0,
