@@ -518,22 +518,27 @@ def assert_shape(arr, shape):
     assert arr.shape == shape, 'Wrong shape\nExists {0} but {1} is wanted.'.format(arr.shape, shape)
 
 default_config = {
-        'S_cost': 1,
-        'R_cost': 3,
-        'C_cost': 30,
-        'B_cost': 100,
-        'benefit': 0.9,
+        'S_cost':             1, # Metabolic cost of signalling
+        'R_Metabolic cost':   3, # Metabolic cost of having a receptor
+        'C_Metabolic cost':  30, # Metabolic cost of being cooperative
+        'B_cost':           100, # Basal metabolic cost
+        'benefit':          0.9, # The fraction reduced, out of total metabolic cost, when
+                                 #    public goods reach threshold of benefit.
+        # Likelihoods of switch (on to off and vica versa) for each gene per cell per generation.
         'mutation_rate_r': 1e-4,
         'mutation_rate_s': 1e-4,
         'mutation_rate_c': 1e-4,
-        'S_th': 3,
-        'C_th': 3,
-        'diffusion_amount': 0.5,
-        'board_size': 10,
-        'generations': 10,
-        'S_rad': 1,
-        'C_rad': 1,
-        'samples_per_gen': 1,
+        'S_th':               3, # Amount of signal needed for a receptive and cooperative cell to
+                                 #    start producing public goods.
+        'C_th':               3, # Amount of public goods needed for metabolic benefit.
+        'diffusion_amount': 0.5, # Average fraction of cells out of total cells on the board (board_size**2)
+                                 #    which will be involved
+        'board_size':        10, # The length of the board. The board will be of shape (board_size, board_size).
+        'generations':       10, # Each generation involves, on average, all cells in a competition, meaning
+                                 #    board_size**2 competitions.
+        'S_rad':              1,
+        'C_rad':              1,
+        'samples_per_gen':    1,
         'initial_receptives_amount': 0,
         'initial_signallers_amount': 0,
         'initial_cooperators_amount': 0,

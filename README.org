@@ -1,3 +1,9 @@
-* A model by Dr. Avigdor Eldar based on Czárán's work.
+* Eventually, a model by Dr. Avigdor Eldar based on Czárán's work.
   http://www.plosone.org/article/info:doi/10.1371/journal.pone.0006655
-
+** There should be two kinds of models
+*** Avigdor's
+**** The population has two kinds of signals (S1, S2) and two kinds of receptors (R1, R2).
+     S1 affects positively R1
+     S2 affects positively R2
+*** Czárán's
+**** The population has one kind of signal (S) and one kind of receptor (R).
