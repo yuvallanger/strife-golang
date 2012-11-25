@@ -3,7 +3,7 @@
 ** There should be two kinds of models
 *** Avigdor's
 **** The population has two kinds of signals (S1, S2) and two kinds of receptors (R1, R2).
-     S1 affects positively R1
-     S2 affects positively R2
+***** S1 affects positively R1
+***** S2 affects positively R2
 *** Czárán's
 **** The population has one kind of signal (S) and one kind of receptor (R).
