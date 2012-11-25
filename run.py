@@ -38,7 +38,7 @@ if __name__ == '__main__':
       config = strife.default_config
       for i, arg in enumerate(sys.argv):
           if arg in ('--datafile', '-d'):
-              data_filename = sys.argv[i+1]
+              config['data_filename'] = sys.argv[i+1]
           if arg in ('--config', '-c'):
               conf_filename = sys.argv[i+1]
               config = strife.load_config(conf_filename)
