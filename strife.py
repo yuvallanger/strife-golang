@@ -126,6 +126,13 @@ class gameOfStrife:
             self.__init_unpack_parameters__(d)
     
     def __init_unpack_parameters__(self, d):
+
+        """
+        __init_unpack_parameters__(self, d)
+
+        Introdueces the key-value pairs of dictionary "d" as attributes of self.
+        """
+
         self.parameters = set()
         for key, val in d.items():
             setattr(self, key, val)
@@ -138,7 +145,7 @@ class gameOfStrife:
 #    @profile
     def competition(self, c_pos_1, c_pos_2, p_pair):
 
-        '''
+        """
         competition(self, cell_pos_1, cell_pos_2, p_pair) -> (int, int)
 
         Decides which of the two positions wins.
@@ -146,7 +153,7 @@ class gameOfStrife:
         Coordinates are a numpy array of shape=(2,) and an integer dtype.
         Takes two adjacent position coordinates on the board and each one's TODO: what's the name of such probability values?
         p_pair: an array of two uniform distribution over [0, 1).
-        '''
+        """
 
         p1, p2 = p_pair
         assert p1.shape=(2,) & p2.shape=(2,), 'p1 ({0}) and p2 ({1}) need to be of shape (2,)'.format(p1, p2)
@@ -329,23 +336,23 @@ shape: {1}'''.format(C_conv.shape, shape)
     
     def copycell(self, orig, dest):
 
-        '''
+        """
         copycell(self, orig, dest) -> NoneType
 
         Copies the contents of self.board at coordinates of position "orig" into the position of coordinates "dest".
         Coordinates are a numpy array of shape=(2,) and an integer dtype.
-        '''
+        """
 
         assert orig.shape == (2,) and dest.shape == (2,), 'orig.shape: {0}\ndest.shape: {1}'.format(orig.shape, dest.shape)
         self.board[dest[0], dest[1]] = self.board[orig[0], orig[1]]
 
     def mutate(self, pos):
 
-        '''
+        """
         mutate(self, pos) -> NoneType
 
         For each value of self.board at position "pos", change its value at probability of self.mutation_rate_[r/s/c].
-        '''
+        """
 
         if sp.rand() < self.mutation_rate_r:
             self.board[pos[0], pos[1], 0] = self.board[pos[0], pos[1], 0] ^ True
@@ -356,14 +363,14 @@ shape: {1}'''.format(C_conv.shape, shape)
 
     def diffuse(self, direction, position):
 
-        '''
+        """
         diffuse(self, direction, position) -> NoneType
 
         Turns a 2 by 2 sub-array of self.board by 90 degrees.
         Direction:
             True - turn 
         with its lowest valued coordinate (upper left) in the "position" coordinate value.
-        '''
+        """
         
         diffuse_code = r'''
 //bool temp_values[3][2][2];
@@ -450,6 +457,11 @@ for (int i; i < 2; i++)
                                         'temp_value': temp_value })
         
     def save_h5(self):
+
+        """
+        Saves the attributes of self whose names show up as keys in self.parameters.
+        """
+
         with h5py.File(self.fname) as ff:
             for key in self.parameters:
                 try:
@@ -596,9 +608,9 @@ default_config = {
         'data_filename': 'strife.h5' }
 
 def load_config(config_filename):
-    '''
+    """
     Takes a string holding filename and returns a dictionary with all the configuration values.
-    '''
+    """
     our_config = default_config
 
     config = ConfigParse.SafeConfigParser()
