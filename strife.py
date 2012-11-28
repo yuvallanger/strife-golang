@@ -137,7 +137,17 @@ class gameOfStrife:
     
 #    @profile
     def competition(self, c_pos_1, c_pos_2, p_pair):
-        '''Takes two adjacent positions on the board and two uniform distribution over [0, 1). Decides which of the two positions wins.'''
+
+        '''
+        competition(self, cell_pos_1, cell_pos_2, p_pair) -> (int, int)
+
+        Decides which of the two positions wins.
+
+        Coordinates are a numpy array of shape=(2,) and an integer dtype.
+        Takes two adjacent position coordinates on the board and each one's TODO: what's the name of such probability values?
+        p_pair: an array of two uniform distribution over [0, 1).
+        '''
+
         p1, p2 = p_pair
         assert (0 <= p1 < 1) and (0 <= p2 < 1), 'p1 ({0}) and p2 ({1}) need to be over [0, 1)'.format(p1, p2)
         # c_pos_2's coordinates in a torus:
@@ -314,11 +324,22 @@ shape: {1}'''.format(C_conv.shape, shape)
                     # competitor 2 wins
                     return (c_pos_2t, c_pos_1)
     
-    def copycell(self, orig, copy):
-        assert orig.shape == (2,) and copy.shape == (2,), 'orig.shape: {0}\ncopy.shape: {1}'.format(orig.shape, copy.shape)
-        self.B[copy[0], copy[1]] = self.B[orig[0], orig[1]]
+    def copycell(self, orig, dest):
+
+        '''
+        copycell(self, orig, dest) -> NoneType
+
+        Copies the contents of self.board at coordinates of position "orig" into the position of coordinates "dest".
+        Coordinates are a numpy array of shape=(2,) and an integer dtype.
+        '''
+
+        assert orig.shape == (2,) and dest.shape == (2,), 'orig.shape: {0}\ndest.shape: {1}'.format(orig.shape, dest.shape)
+        self.B[dest[0], dest[1]] = self.B[orig[0], orig[1]]
 
     def mutate(self, pos):
+
+        '''
+        mutate(
         if sp.rand() < self.mutation_rate_r:
             self.B[pos[0], pos[1], 0] = self.B[pos[0], pos[1], 0] ^ True
         if sp.rand() < self.mutation_rate_s:
@@ -441,7 +462,7 @@ for (int i; i < 2; i++)
             self.mutate(loser_pos)
         for i in range(sp.int64((self.N ** 2) * self.diffusion_amount // 4)):
             print 'diffusion: {0}'.format(i)
-            direction = sp.random.rand()
+            direction = sp.rand()
             position = sp.random.randint(self.N, size=2)
             self.diffuse(direction, position)
         if not self.step_count % self.steps_per_sample:
