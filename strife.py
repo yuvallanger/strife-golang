@@ -41,7 +41,7 @@ class gameOfStrife:
         d['S_cost'] = sp.int64(config['S_cost'])
         d['R_cost'] = sp.int64(config['R_cost'])
         d['C_cost'] = sp.int64(config['C_cost'])
-        d['B_cost'] = sp.int64(config['B_cost'])  # B for Baseline, basal, "basic metabolic burden"
+        d['metabolic_baseline'] = sp.int64(config['metabolic_baseline'])  # B for Baseline, basal, "basic metabolic burden"
 
         #####
         # benefit from cooperation. "reward factor" in the article.
@@ -154,19 +154,19 @@ class gameOfStrife:
         assert ((0 <= p1) & (p1 < 1) & (0 <= p2) & (p2 < 1)).all(), 'p1 ({0}) and p2 ({1}) need to be over [0, 1)'.format(p1, p2)
 
         # c_pos_2's coordinates in a torus:
-        c_pos_2t = c_pos_2 % self.N
+        c_pos_2t = c_pos_2 % self.board_edge_length
         assert (0 <= c_pos_1[0]) and \
                (0 <= c_pos_1[1]) and \
                (0 <= c_pos_2t[0]) and \
                (0 <= c_pos_2t[1]) and \
-               (c_pos_1[0] < self.N) and \
-               (c_pos_1[1] < self.N) and \
-               (c_pos_2t[0] < self.N) and \
-               (c_pos_2t[1] < self.N), 'c_pos_1: {0}\nc_pos_2t: {1}'.format(c_pos_1, c_pos_2t)
+               (c_pos_1[0] < self.board_edge_length) and \
+               (c_pos_1[1] < self.board_edge_length) and \
+               (c_pos_2t[0] < self.board_edge_length) and \
+               (c_pos_2t[1] < self.board_edge_length), 'c_pos_1: {0}\nc_pos_2t: {1}'.format(c_pos_1, c_pos_2t)
 
         # two identical cells competing will result in two identical cells,
         # so we will return now with no further calculation of this competition.
-        if (self.B[c_pos_1[0], c_pos_1[1]] == self.B[c_pos_2t[0], c_pos_2t[1]]).all():
+        if (self.board[c_pos_1[0], c_pos_1[1]] == self.board[c_pos_2t[0], c_pos_2t[1]]).all():
             return (c_pos_2t, c_pos_1)
 
         ## We will optimize by taking a sub array from each genotype array around the competitors.
@@ -186,10 +186,10 @@ class gameOfStrife:
         
         # For signallers, we take both S_rad and C_rad around our competitors because
         # signallers affect CR[Ss] cells which, with their public goods, affect our competitors
-        s_row_range = sp.arange(rl - self.S_rad - self.C_rad, rh + self.S_rad + self.C_rad + 1) % self.N
-        s_col_range = sp.arange(cl - self.S_rad - self.C_rad, ch + self.S_rad + self.C_rad + 1) % self.N
-        rc_row_range = sp.arange(rl - self.C_rad, rh + self.C_rad + 1) % self.N
-        rc_col_range = sp.arange(cl - self.C_rad, ch + self.C_rad + 1) % self.N
+        s_row_range = sp.arange(rl - self.S_rad - self.C_rad, rh + self.S_rad + self.C_rad + 1) % self.board_edge_length
+        s_col_range = sp.arange(cl - self.S_rad - self.C_rad, ch + self.S_rad + self.C_rad + 1) % self.board_edge_length
+        rc_row_range = sp.arange(rl - self.C_rad, rh + self.C_rad + 1) % self.board_edge_length
+        rc_col_range = sp.arange(cl - self.C_rad, ch + self.C_rad + 1) % self.board_edge_length
 
         assert self.S_rad.dtype.kind == sp.int8(1).dtype.kind, 'Got {0}, wanted {1}'.format(self.S_rad.dtype.kind, sp.int_(1).dtype.kind)
         assert self.C_rad.dtype.kind == sp.int8(1).dtype.kind, 'Got {0}, wanted {1}'.format(self.C_rad.dtype.kind, sp.int_(1).dtype.kind)
@@ -206,9 +206,9 @@ wanted: {3}'''.format(rc_row_range, rl, rh, (shape[0]-1 + 2 * self.C_rad + 1, ))
 cl: {1}; ch: {2}
 wanted: {3}'''.format(rc_col_range, cl, ch, (shape[1]-1 + 2 * self.C_rad + 1, ))
 
-        R_sub = self.B[rc_row_range, :, 0][:, rc_col_range]
-        S_sub = self.B[s_row_range, :, 1][:, s_col_range]
-        C_sub = self.B[rc_row_range, :, 2][:, rc_col_range]
+        R_sub = self.board[rc_row_range, :, 0][:, rc_col_range]
+        S_sub = self.board[s_row_range, :, 1][:, s_col_range]
+        C_sub = self.board[rc_row_range, :, 2][:, rc_col_range]
 
         assert R_sub.shape == tuple(sp.array(shape)+2), 'R_sub.shape: {0}\nshape: {1} and shape+2: {2}'.format(R_sub.shape, shape, sp.array(shape)+2)
         assert S_sub.shape == tuple(sp.array(shape)+4), 'R_sub.shape: {0}\nshape: {1} and shape+2: {2}'.format(R_sub.shape, shape, sp.array(shape)+4)
@@ -251,20 +251,20 @@ shape: {1}'''.format(C_conv.shape, shape)
         
         # all cells for which the effect of goods is above threshold is True in G.
         # M for Metabolism
-        twocellpos_r = sp.arange(rl, rh + 1) % self.N
-        twocellpos_c = sp.arange(cl, ch + 1) % self.N
+        twocellpos_r = sp.arange(rl, rh + 1) % self.board_edge_length
+        twocellpos_c = sp.arange(cl, ch + 1) % self.board_edge_length
 
         assert (twocellpos_r.shape == (2,) and twocellpos_c.shape == (1,)) or (twocellpos_r.shape == (1,) and twocellpos_c.shape == (2,)), 'twocellpos_r.shape: {0}\ntwocellpos_c.shape: {1}\nshape: {2}'.format(twocellpos_r.shape, twocellpos_c.shape, shape)
 
-        R_cost_board = self.R_cost * self.B[twocellpos_r, twocellpos_c, 0].reshape(shape)
-        S_cost_board = self.S_cost * self.B[twocellpos_r, twocellpos_c, 1].reshape(shape)
+        R_cost_board = self.R_cost * self.board[twocellpos_r, twocellpos_c, 0].reshape(shape)
+        S_cost_board = self.S_cost * self.board[twocellpos_r, twocellpos_c, 1].reshape(shape)
         C_cost_board = self.C_cost * cooping_competitors
 
         assert R_cost_board.shape == shape, 'R_cost_board: {0}\nWanted ndim: 1'.format(R_cost_board)
         assert S_cost_board.shape == shape, 'S_cost_board: {0}\nWanted ndim: 1'.format(S_cost_board)
         assert C_cost_board.shape == shape, 'C_cost_board: {0}\nWanted ndim: 1'.format(C_cost_board)
 
-        Total_cost_board = S_cost_board + R_cost_board + C_cost_board + self.B_cost
+        Total_cost_board = S_cost_board + R_cost_board + C_cost_board + self.metabolic_baseline
 
         assert_ndim(Total_cost_board, 2)
 
@@ -273,7 +273,7 @@ shape: {1}'''.format(C_conv.shape, shape)
         # all false in G don't benefit from public goods (G^True flips values)
         M += (G^True) *  Total_cost_board
         assert_ndim(M, 2)
-        M = self.B_cost / M
+        M = self.metabolic_baseline / M
         assert_ndim(M, 2)
         score1 = p1 * M.item(0) # score1 is the first position's score
         score2 = p2 * M.item(1) # score2 is the second position's score
@@ -337,26 +337,36 @@ shape: {1}'''.format(C_conv.shape, shape)
         '''
 
         assert orig.shape == (2,) and dest.shape == (2,), 'orig.shape: {0}\ndest.shape: {1}'.format(orig.shape, dest.shape)
-        self.B[dest[0], dest[1]] = self.B[orig[0], orig[1]]
+        self.board[dest[0], dest[1]] = self.board[orig[0], orig[1]]
 
     def mutate(self, pos):
 
         '''
         mutate(self, pos) -> NoneType
 
-        For each value at position "pos", change its value at probability of self.mutation_rate_[r/s/c].
+        For each value of self.board at position "pos", change its value at probability of self.mutation_rate_[r/s/c].
         '''
+
         if sp.rand() < self.mutation_rate_r:
-            self.B[pos[0], pos[1], 0] = self.B[pos[0], pos[1], 0] ^ True
+            self.board[pos[0], pos[1], 0] = self.board[pos[0], pos[1], 0] ^ True
         if sp.rand() < self.mutation_rate_s:
-            self.B[pos[0], pos[1], 1] = self.B[pos[0], pos[1], 1] ^ True
+            self.board[pos[0], pos[1], 1] = self.board[pos[0], pos[1], 1] ^ True
         if sp.rand() < self.mutation_rate_c:
-            self.B[pos[0], pos[1], 2] = self.B[pos[0], pos[1], 2] ^ True
+            self.board[pos[0], pos[1], 2] = self.board[pos[0], pos[1], 2] ^ True
 
     def diffuse(self, direction, position):
-        row, col = position
+
+        '''
+        diffuse(self, direction, position) -> NoneType
+
+        Turns a 2 by 2 sub-array of self.board by 90 degrees.
+        Direction:
+            True - turn 
+        with its lowest valued coordinate (upper left) in the "position" coordinate value.
+        '''
+        
         diffuse_code = r'''
-bool tmp_values[3][2][2];
+//bool temp_values[3][2][2];
 
 long int genotype_i , row_i , col_i ;
 genotype_i = row_i = col_i = 0;
@@ -367,7 +377,7 @@ for (row_i = 0; row_i < 2; row_i++)
   {
     for (genotype_i = 0; genotype_i < 3; genotype_i++)
     {
-      tmp_values[row_i % board_size][col_i % board_size][genotype_i] = b[row_i % board_size, col_i % board_size, genotype_i];
+      temp_values[row_i % board_size][col_i % board_size][genotype_i] = b[row_i % board_size, col_i % board_size, genotype_i];
     }
   }
 }
@@ -392,20 +402,20 @@ if (d < 0.5)
 {
   for (genotype_i = 0; genotype_i < 3; genotype_i++)
   {
-    b[ row , col , genotype_i ] = tmp_values[ row , col1, genotype_i ]; // anticlockwise index map
-    b[ row , col1, genotype_i ] = tmp_values[ row1, col1, genotype_i ]; // 00 01 -> 01 11
-    b[ row1, col , genotype_i ] = tmp_values[ row , col , genotype_i ]; // 10 11 -> 00 10
-    b[ row1, col1, genotype_i ] = tmp_values[ row1, col , genotype_i ];
+    b[ row , col , genotype_i ] = temp_values[ row , col1, genotype_i ]; // anticlockwise index map
+    b[ row , col1, genotype_i ] = temp_values[ row1, col1, genotype_i ]; // 00 01 -> 01 11
+    b[ row1, col , genotype_i ] = temp_values[ row , col , genotype_i ]; // 10 11 -> 00 10
+    b[ row1, col1, genotype_i ] = temp_values[ row1, col , genotype_i ];
   }
 }
 else
 {
   for (genotype_i = 0; genotype_i < 3; genotype_i++)
   {
-    b[ row , col , genotype_i ] = tmp_values[ genotype_i, row1, col  ]; // clockwise index map
-    b[ row , col1, genotype_i ] = tmp_values[ genotype_i, row , col  ]; // 00 01 -> 10 00
-    b[ row1, col , genotype_i ] = tmp_values[ genotype_i, row1, col1 ]; // 10 11 -> 11 01
-    b[ row1, col1, genotype_i ] = tmp_values[ genotype_i, row , col1 ];
+    b[ row , col , genotype_i ] = temp_values[ genotype_i, row1, col  ]; // clockwise index map
+    b[ row , col1, genotype_i ] = temp_values[ genotype_i, row , col  ]; // 00 01 -> 10 00
+    b[ row1, col , genotype_i ] = temp_values[ genotype_i, row1, col1 ]; // 10 11 -> 11 01
+    b[ row1, col1, genotype_i ] = temp_values[ genotype_i, row , col1 ];
   }
 }
 /*
@@ -423,7 +433,21 @@ for (int i; i < 2; i++)
 }
 */
 '''
-        sp.weave.inline(diffuse_code, ['board_size', 'b', 'row', 'col', 'd'], {'board_size': self.N, 'b': self.B, 'row': row, 'col': col, 'd': direction})
+        row, col = position
+        temp_values = sp.empty((3,2,2), dtype=sp.bool_)
+        
+        sp.weave.inline(diffuse_code, ['board_size',
+                                       'board',
+                                       'row',
+                                       'col',
+                                       'direction',
+                                       'temp_valuee'],
+                                       {'board_size': self.board_edge_length,
+                                        'board': self.board,
+                                        'row': row,
+                                        'col': col,
+                                        'direction': direction
+                                        'temp_value': temp_value })
         
     def save_h5(self):
         with h5py.File(self.fname) as ff:
@@ -440,7 +464,7 @@ for (int i; i < 2; i++)
             self.__init_unpack_parameters__(d)
     
     def sample(self):
-        joint_board = self.B[:, :, 0] + 2 * self.B[:, :, 1] + 4 * self.B[:, :, 2]
+        joint_board = self.board[:, :, 0] + 2 * self.board[:, :, 1] + 4 * self.board[:, :, 2]
         for genotype in range(8):
             genotype_board = joint_board == genotype
             genotype_frequency = sp.sum(genotype_board)
@@ -455,27 +479,27 @@ for (int i; i < 2; i++)
 
     def nextstep(self):
         print 'generation:', self.step_count
-        for i in range(self.N ** 2):
+        for i in range(self.board_edge_length ** 2):
             print 'competition:', i
             ##
             # Draw two adjacent positions.
             # We'll use relative positions to compute exact positions of 2nd competitor cell
-            pos1 = sp.random.randint(self.N, size=2)
+            pos1 = sp.random.randint(self.board_edge_length, size=2)
             pos2 = pos1 + self.NEIGHBOUR_REL_POS[sp.random.randint(4)]
             p_pair = sp.rand(2)
             winner_pos, loser_pos = self.competition(pos1, pos2, p_pair)
             self.copycell(winner_pos, loser_pos)
             self.mutate(loser_pos)
-        for i in range(sp.int64((self.N ** 2) * self.diffusion_amount // 4)):
+        for i in range(sp.int64((self.board_edge_length ** 2) * self.diffusion_amount // 4)):
             print 'diffusion: {0}'.format(i)
             direction = sp.rand()
-            position = sp.random.randint(self.N, size=2)
+            position = sp.random.randint(self.board_edge_length, size=2)
             self.diffuse(direction, position)
         if not self.step_count % self.steps_per_sample:
             self.sample()
         if not self.step_count % self.steps_per_board_sample:
             board_sample_num = self.step_count // self.steps_per_board_sample
-            self.samples_board[board_sample_num] = self.B
+            self.samples_board[board_sample_num] = self.board
         self.step_count += 1
 
     ## process data
@@ -548,7 +572,7 @@ default_config = {
         'S_cost':             1, # Metabolic cost of signalling
         'R_Metabolic cost':   3, # Metabolic cost of having a receptor
         'C_Metabolic cost':  30, # Metabolic cost of being cooperative
-        'B_cost':           100, # Basal metabolic cost
+        'metabolic_baseline':           100, # Basal metabolic cost
         'benefit':          0.9, # The fraction reduced, out of total metabolic cost, when
                                  #    public goods reach threshold of benefit.
         # Likelihoods of switch (on to off and vica versa) for each gene per cell per generation.
