@@ -149,7 +149,10 @@ class gameOfStrife:
         '''
 
         p1, p2 = p_pair
-        assert (0 <= p1 < 1) and (0 <= p2 < 1), 'p1 ({0}) and p2 ({1}) need to be over [0, 1)'.format(p1, p2)
+        assert p1.shape=(2,) & p2.shape=(2,), 'p1 ({0}) and p2 ({1}) need to be of shape (2,)'.format(p1, p2)
+        assert p1.dtype.kind == 'i' & p2.dtype.kind == 'i', 'p1 ({0}) and p2 ({1}) need to be of integer dtype'.format(p1, p2)
+        assert ((0 <= p1) & (p1 < 1) & (0 <= p2) & (p2 < 1)).all(), 'p1 ({0}) and p2 ({1}) need to be over [0, 1)'.format(p1, p2)
+
         # c_pos_2's coordinates in a torus:
         c_pos_2t = c_pos_2 % self.N
         assert (0 <= c_pos_1[0]) and \
@@ -339,7 +342,10 @@ shape: {1}'''.format(C_conv.shape, shape)
     def mutate(self, pos):
 
         '''
-        mutate(
+        mutate(self, pos) -> NoneType
+
+        For each value at position "pos", change its value at probability of self.mutation_rate_[r/s/c].
+        '''
         if sp.rand() < self.mutation_rate_r:
             self.B[pos[0], pos[1], 0] = self.B[pos[0], pos[1], 0] ^ True
         if sp.rand() < self.mutation_rate_s:
