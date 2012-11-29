@@ -21,7 +21,7 @@ import ConfigParser
 labels = ['Ignorant (csr)', 'Voyeur (csR)', 'Liar (cSr)', 'Lame (cSR)',
           'Blunt (Csr)', 'Shy (CsR)', 'Vain (CSr)', 'Honest (CSR)']
 
-class gameOfStrife:
+class Strife:
     def __init__(self, config=None):
         if config == None:
             config = default_config
@@ -141,7 +141,59 @@ class gameOfStrife:
     ######
     ## functions
     ######    
-    
+    def count_neighbors(self, row, col, gene, allele):
+        """
+        Counts all neighbors that have "allele" as their "gene" around cell at (row, col)
+        """
+
+        >>> import scipy
+        >>> import strife
+        >>> a = strife.Strife()
+        >>> board = scipy.array([[[1, 1, 1],
+                                  [0, 1, 0],
+                                  [0, 0, 0]],
+                                 [[0, 1, 1],
+                                  [0, 1, 0],
+                                  [0, 0, 0]],
+                                 [[0, 0, 1],
+                                  [0, 1, 0],
+                                  [0, 0, 0]]], dtype=scipy.bool_)
+        >>> a.board = board
+        >>> a.count_neighbors(1,1,0,0)
+        8
+        >>> a.count_neighbors(1,1,0,1)
+        1
+        >>> a.count_neighbors(1,1,1,0)
+        4
+        >>> a.count_neighbors(1,1,1,1)
+        5
+        >>> a.count_neighbors(1,1,2,0)
+        6
+        >>> a.count_neighbors(1,1,2,1)
+        3
+        """
+
+        inline_code = '''
+        long count_neighbors (board, long row, long col, long gene, long allele)
+{
+    long signed int row_i, col_i;
+    long signed int count;
+    for (row_i = 0; row_i < board.shape[0]; row_i++)
+    {
+        for (col_j; col_j < board.shape[1]; col_i++)
+        {
+            if (board[row_i, col_j, gene] == allele)
+            {
+                count++;
+            }
+        }
+    }
+    return_val = count;
+}
+'''
+        sp.weave.inline(inline_code, arg_names = ['row', 'col', 'gene', 'allele'],
+                        local_dict = {'board': self.board}
+
 #    @profile
     def competition(self, c_pos_1, c_pos_2, p_pair):
 
@@ -156,7 +208,7 @@ class gameOfStrife:
         """
 
         p1, p2 = p_pair
-        assert p1.shape=(2,) & p2.shape=(2,), 'p1 ({0}) and p2 ({1}) need to be of shape (2,)'.format(p1, p2)
+        assert p1.shape == (2,) & p2.shape == (2,), 'p1 ({0}) and p2 ({1}) need to be of shape (2,)'.format(p1, p2)
         assert p1.dtype.kind == 'i' & p2.dtype.kind == 'i', 'p1 ({0}) and p2 ({1}) need to be of integer dtype'.format(p1, p2)
         assert ((0 <= p1) & (p1 < 1) & (0 <= p2) & (p2 < 1)).all(), 'p1 ({0}) and p2 ({1}) need to be over [0, 1)'.format(p1, p2)
 
@@ -453,8 +505,8 @@ for (int i; i < 2; i++)
                                         'board': self.board,
                                         'row': row,
                                         'col': col,
-                                        'direction': direction
-                                        'temp_value': temp_value })
+                                        'direction': direction,
+                                        'temp_value': temp_values })
         
     def save_h5(self):
 
@@ -613,7 +665,7 @@ def load_config(config_filename):
     """
     our_config = default_config
 
-    config = ConfigParse.SafeConfigParser()
+    config = ConfigParser.SafeConfigParser()
     config.read(config_filename)
 
     for key, val in our_config:
