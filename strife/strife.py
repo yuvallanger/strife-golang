@@ -161,35 +161,38 @@ long signed int row_i, col_i;
 long count = 0;
 long row_torus;
 long col_torus;
-long row_center, 
+long row_center, col_center;
 
 for (row_center = ROWS1(0); row_center <= ROWS1(1); row_center++)
 {
     for (col_center = COLS1(0); col_center <= COLS(1); col_center++)
     {
-        
-for (row_i = row-radius; row_i <= row+radius; row_i++)
-{
-    for (col_i = col-radius; col_i <= col+radius; col_i++)
-    {
-        row_torus = row_i%Nboard[0];
-        col_torus = col_i%Nboard[1];
-/*        printf("gene: %d; ", gene);
-        printf("board[%d, %d, %d]: %d; ", row_i, col_i, allele, BOARD3(row_i%Nboard[0], col_i%Nboard[1], gene));
-        printf("shape: (%d, %d); ", Nboard[0], Nboard[1]);
-        printf("count: %d; ", count);
-        printf("\n");
-        */
-
-
-        if ((BOARD3(row_i%Nboard[0], col_i%Nboard[1], gene)) == allele)
+        count = 0;
+        for (row_i = row_center-radius; row_i <= row_center+radius; row_i++)
         {
-            count++;
+            for (col_i = col_center-radius; col_i <= col_center+radius; col_i++)
+            {
+                row_torus = row_i%Nboard[0];
+                col_torus = col_i%Nboard[1];
+        /*        printf("gene: %d; ", gene);
+                printf("board[%d, %d, %d]: %d; ", row_i, col_i, allele, BOARD3(row_i%Nboard[0], col_i%Nboard[1], gene));
+                printf("shape: (%d, %d); ", Nboard[0], Nboard[1]);
+                printf("count: %d; ", count);
+                printf("\n");
+                */
+
+
+                if ((BOARD3(row_torus, col_torus, gene)) == allele)
+                {
+                    count++;
+                }
+                /*
+                printf("count: %d; ", count);
+                printf("\n");
+                */
+            }
         }
-        /*
-        printf("count: %d; ", count);
-        printf("\n");
-        */
+        SUM_BOARD(row_center % Nboard[0] - ROWS1(0) % Nboard(0), col_center % Nboard[1] - COLS1(0) % Nboard(1)) = counter
     }
 }
 
