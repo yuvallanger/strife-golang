@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+
 """
 A model by Dr. Avigdor Eldar based on Czárán's work.
 http://www.plosone.org/article/info:doi/10.1371/journal.pone.0006655
@@ -22,6 +23,13 @@ labels = ['Ignorant (csr)', 'Voyeur (csR)', 'Liar (cSr)', 'Lame (cSR)',
           'Blunt (Csr)', 'Shy (CsR)', 'Vain (CSr)', 'Honest (CSR)']
 
 class Strife:
+
+    """
+    Strife class
+
+    When initiated with no config dictionary, default_config is loaded.
+    """
+
     def __init__(self, config=None):
         if config == None:
             config = default_config
@@ -69,7 +77,7 @@ class Strife:
        
         d['generations'] = sp.int64(config['generations'])
 
-        d['N'] = sp.int64(config['board_size'])
+        d['board_size'] = sp.int64(config['board_size'])
       
         #####
         # settings
@@ -88,7 +96,7 @@ class Strife:
         d['step_count'] = sp.int64(0)
 
 
-        d['steps_final'] = sp.int64(d['generations'] * d['N']**2)
+        d['steps_final'] = sp.int64(d['generations'] * d['board_size']**2)
 
         # diameter of the convolution matrix
         diameter = lambda x: sp.int64(2 * x + 1)
@@ -100,17 +108,17 @@ class Strife:
         d['C_kernel'] = sp.ones((C_len, C_len))
 
         # A cell can be Signalling and/or Receptive and/or Cooperative
-        R = sp.rand(d['N'], d['N']) > config['initial_receptives_amount']
-        S = sp.rand(d['N'], d['N']) > config['initial_signallers_amount']
-        C = sp.rand(d['N'], d['N']) > config['initial_cooperators_amount']
-        d['B'] = sp.array([R, S, C]).transpose((1,2,0))
-        assert d['N'] == d['B'].shape[0] and d['N'] == d['B'].shape[1], 'B.shape: {0}\nN: {1}\nWanted: {2}'.format(d['B'].shape, d['N'], (d['N'], d['N'], 3))
+        R = sp.rand(d['board_size'], d['board_size']) < config['initial_receptives_amount']
+        S = sp.rand(d['board_size'], d['board_size']) < config['initial_signallers_amount']
+        C = sp.rand(d['board_size'], d['board_size']) < config['initial_cooperators_amount']
+        d['board'] = sp.array([R, S, C]).transpose((1,2,0))
+        assert d['board_size'] == d['board'].shape[0] and d['board_size'] == d['board'].shape[1], 'B.shape: {0}\nN: {1}\nWanted: {2}'.format(d['board'].shape, d['board_size'], (d['board_size'], d['board_size'], 3))
         
         d['genotype_num'] = sp.int64(8)
         
         ## data sampling
         # we will take a frequency sample some number of times per generation
-        d['steps_per_gen'] = sp.int64(d['N'] ** 2)
+        d['steps_per_gen'] = sp.int64(d['board_size'] ** 2)
         d['samples_per_gen'] = sp.int64(1)
         d['samples_num'] = sp.int64(d['samples_per_gen'] * d['generations'])
         d['samples_board_num'] = sp.int64(d['samples_num'] // 10)
@@ -120,7 +128,7 @@ class Strife:
         # We want to know the frequency of each genotype per generation
         d['samples_frequency'] = sp.empty((d['samples_num'], d['genotype_num']), dtype='int32')
         d['samples_nhood'] = sp.empty((d['samples_num'], d['genotype_num'], d['genotype_num']), dtype=sp.int64)
-        d['samples_board'] = sp.empty((d['samples_board_num'], d['N'], d['N'], 3), dtype=sp.int64)
+        d['samples_board'] = sp.empty((d['samples_board_num'], d['board_size'], d['board_size'], 3), dtype=sp.int64)
        
         if not config == None:
             self.__init_unpack_parameters__(d)
@@ -141,62 +149,59 @@ class Strife:
     ######
     ## functions
     ######    
-    def count_neighbors(self, row, col, gene, allele):
+    def count_neighbors_valid(self, rows, cols, gene, allele, radius):
         """
-        Counts all neighbors that have "allele" as their "gene" around cell at (row, col)
+        Counts all neighbors that have "allele" as their "gene" at a Moore's "radius" around each cell that lies between
+          rows[0] and rows[1] and between cols[0] and cols[1], inclusive.
+        
+        Acts like scipy.signal.convolve2d with mode = 'valid', except that it only counts, does not convolves.
         """
+        count_neighbors_code = r'''
+long signed int row_i, col_i;
+long count = 0;
+long row_torus;
+long col_torus;
+long row_center, 
 
-        >>> import scipy
-        >>> import strife
-        >>> a = strife.Strife()
-        >>> board = scipy.array([[[1, 1, 1],
-                                  [0, 1, 0],
-                                  [0, 0, 0]],
-                                 [[0, 1, 1],
-                                  [0, 1, 0],
-                                  [0, 0, 0]],
-                                 [[0, 0, 1],
-                                  [0, 1, 0],
-                                  [0, 0, 0]]], dtype=scipy.bool_)
-        >>> a.board = board
-        >>> a.count_neighbors(1,1,0,0)
-        8
-        >>> a.count_neighbors(1,1,0,1)
-        1
-        >>> a.count_neighbors(1,1,1,0)
-        4
-        >>> a.count_neighbors(1,1,1,1)
-        5
-        >>> a.count_neighbors(1,1,2,0)
-        6
-        >>> a.count_neighbors(1,1,2,1)
-        3
-        """
-
-        inline_code = '''
-        long count_neighbors (board, long row, long col, long gene, long allele)
+for (row_center = ROWS1(0); row_center <= ROWS1(1); row_center++)
 {
-    long signed int row_i, col_i;
-    long signed int count;
-    for (row_i = 0; row_i < board.shape[0]; row_i++)
+    for (col_center = COLS1(0); col_center <= COLS(1); col_center++)
     {
-        for (col_j; col_j < board.shape[1]; col_i++)
+        
+for (row_i = row-radius; row_i <= row+radius; row_i++)
+{
+    for (col_i = col-radius; col_i <= col+radius; col_i++)
+    {
+        row_torus = row_i%Nboard[0];
+        col_torus = col_i%Nboard[1];
+/*        printf("gene: %d; ", gene);
+        printf("board[%d, %d, %d]: %d; ", row_i, col_i, allele, BOARD3(row_i%Nboard[0], col_i%Nboard[1], gene));
+        printf("shape: (%d, %d); ", Nboard[0], Nboard[1]);
+        printf("count: %d; ", count);
+        printf("\n");
+        */
+
+
+        if ((BOARD3(row_i%Nboard[0], col_i%Nboard[1], gene)) == allele)
         {
-            if (board[row_i, col_j, gene] == allele)
-            {
-                count++;
-            }
+            count++;
         }
+        /*
+        printf("count: %d; ", count);
+        printf("\n");
+        */
     }
-    return_val = count;
 }
+
+return_val = count;
 '''
-        sp.weave.inline(inline_code, arg_names = ['row', 'col', 'gene', 'allele'],
-                        local_dict = {'board': self.board}
+        sum_board = scipy.empty((self.board.shape[0]-radius, self.board.shape[1]-radius))
+        return sp.weave.inline(count_neighbors_code,
+                        ['rows', 'cols', 'gene', 'allele', 'board', 'radius', 'sum_board'],
+                        {'rows': rows, 'cols': cols, 'gene': gene, 'allele': allele, 'board': self.board, 'sum_board': sum_board, 'radius': radius })
 
 #    @profile
     def competition(self, c_pos_1, c_pos_2, p_pair):
-
         """
         competition(self, cell_pos_1, cell_pos_2, p_pair) -> (int, int)
 
@@ -206,22 +211,21 @@ class Strife:
         Takes two adjacent position coordinates on the board and each one's TODO: what's the name of such probability values?
         p_pair: an array of two uniform distribution over [0, 1).
         """
-
         p1, p2 = p_pair
-        assert p1.shape == (2,) & p2.shape == (2,), 'p1 ({0}) and p2 ({1}) need to be of shape (2,)'.format(p1, p2)
-        assert p1.dtype.kind == 'i' & p2.dtype.kind == 'i', 'p1 ({0}) and p2 ({1}) need to be of integer dtype'.format(p1, p2)
-        assert ((0 <= p1) & (p1 < 1) & (0 <= p2) & (p2 < 1)).all(), 'p1 ({0}) and p2 ({1}) need to be over [0, 1)'.format(p1, p2)
+        assert p1.shape == () and p2.shape == (), 'p1 ({p1}) and p2 ({p2}) need to be of shape (). Are actually of {p1shape} and {p2shape}'.format(p1 = p1, p2 = p2, p1shape = p1.shape, p2shape = p2.shape)
+        assert p1.dtype.kind == 'f' and p2.dtype.kind == 'f', 'p1 ({0}) and p2 ({1}) need to be of float dtype, but are actually of {p1dtype} and {p2dtype}.'.format(p1, p2, p1.dtype, p2.dtype)
+        assert ((0 <= p1) & (p1 < 1) and (0 <= p2) & (p2 < 1)).all(), 'p1 ({0}) and p2 ({1}) need to be over [0, 1)'.format(p1, p2)
 
         # c_pos_2's coordinates in a torus:
-        c_pos_2t = c_pos_2 % self.board_edge_length
+        c_pos_2t = c_pos_2 % self.board_size
         assert (0 <= c_pos_1[0]) and \
                (0 <= c_pos_1[1]) and \
                (0 <= c_pos_2t[0]) and \
                (0 <= c_pos_2t[1]) and \
-               (c_pos_1[0] < self.board_edge_length) and \
-               (c_pos_1[1] < self.board_edge_length) and \
-               (c_pos_2t[0] < self.board_edge_length) and \
-               (c_pos_2t[1] < self.board_edge_length), 'c_pos_1: {0}\nc_pos_2t: {1}'.format(c_pos_1, c_pos_2t)
+               (c_pos_1[0] < self.board_size) and \
+               (c_pos_1[1] < self.board_size) and \
+               (c_pos_2t[0] < self.board_size) and \
+               (c_pos_2t[1] < self.board_size), 'c_pos_1: {0}\nc_pos_2t: {1}'.format(c_pos_1, c_pos_2t)
 
         # two identical cells competing will result in two identical cells,
         # so we will return now with no further calculation of this competition.
@@ -245,10 +249,10 @@ class Strife:
         
         # For signallers, we take both S_rad and C_rad around our competitors because
         # signallers affect CR[Ss] cells which, with their public goods, affect our competitors
-        s_row_range = sp.arange(rl - self.S_rad - self.C_rad, rh + self.S_rad + self.C_rad + 1) % self.board_edge_length
-        s_col_range = sp.arange(cl - self.S_rad - self.C_rad, ch + self.S_rad + self.C_rad + 1) % self.board_edge_length
-        rc_row_range = sp.arange(rl - self.C_rad, rh + self.C_rad + 1) % self.board_edge_length
-        rc_col_range = sp.arange(cl - self.C_rad, ch + self.C_rad + 1) % self.board_edge_length
+        s_row_range = sp.arange(rl - self.S_rad - self.C_rad, rh + self.S_rad + self.C_rad + 1) % self.board_size
+        s_col_range = sp.arange(cl - self.S_rad - self.C_rad, ch + self.S_rad + self.C_rad + 1) % self.board_size
+        rc_row_range = sp.arange(rl - self.C_rad, rh + self.C_rad + 1) % self.board_size
+        rc_col_range = sp.arange(cl - self.C_rad, ch + self.C_rad + 1) % self.board_size
 
         assert self.S_rad.dtype.kind == sp.int8(1).dtype.kind, 'Got {0}, wanted {1}'.format(self.S_rad.dtype.kind, sp.int_(1).dtype.kind)
         assert self.C_rad.dtype.kind == sp.int8(1).dtype.kind, 'Got {0}, wanted {1}'.format(self.C_rad.dtype.kind, sp.int_(1).dtype.kind)
@@ -310,8 +314,8 @@ shape: {1}'''.format(C_conv.shape, shape)
         
         # all cells for which the effect of goods is above threshold is True in G.
         # M for Metabolism
-        twocellpos_r = sp.arange(rl, rh + 1) % self.board_edge_length
-        twocellpos_c = sp.arange(cl, ch + 1) % self.board_edge_length
+        twocellpos_r = sp.arange(rl, rh + 1) % self.board_size
+        twocellpos_c = sp.arange(cl, ch + 1) % self.board_size
 
         assert (twocellpos_r.shape == (2,) and twocellpos_c.shape == (1,)) or (twocellpos_r.shape == (1,) and twocellpos_c.shape == (2,)), 'twocellpos_r.shape: {0}\ntwocellpos_c.shape: {1}\nshape: {2}'.format(twocellpos_r.shape, twocellpos_c.shape, shape)
 
@@ -387,25 +391,21 @@ shape: {1}'''.format(C_conv.shape, shape)
                     return (c_pos_2t, c_pos_1)
     
     def copycell(self, orig, dest):
-
         """
         copycell(self, orig, dest) -> NoneType
 
         Copies the contents of self.board at coordinates of position "orig" into the position of coordinates "dest".
         Coordinates are a numpy array of shape=(2,) and an integer dtype.
         """
-
         assert orig.shape == (2,) and dest.shape == (2,), 'orig.shape: {0}\ndest.shape: {1}'.format(orig.shape, dest.shape)
         self.board[dest[0], dest[1]] = self.board[orig[0], orig[1]]
 
     def mutate(self, pos):
-
         """
         mutate(self, pos) -> NoneType
 
         For each value of self.board at position "pos", change its value at probability of self.mutation_rate_[r/s/c].
         """
-
         if sp.rand() < self.mutation_rate_r:
             self.board[pos[0], pos[1], 0] = self.board[pos[0], pos[1], 0] ^ True
         if sp.rand() < self.mutation_rate_s:
@@ -413,107 +413,10 @@ shape: {1}'''.format(C_conv.shape, shape)
         if sp.rand() < self.mutation_rate_c:
             self.board[pos[0], pos[1], 2] = self.board[pos[0], pos[1], 2] ^ True
 
-    def diffuse(self, direction, position):
-
-        """
-        diffuse(self, direction, position) -> NoneType
-
-        Turns a 2 by 2 sub-array of self.board by 90 degrees.
-        Direction:
-            True - turn 
-        with its lowest valued coordinate (upper left) in the "position" coordinate value.
-        """
-        
-        diffuse_code = r'''
-//bool temp_values[3][2][2];
-
-long int genotype_i , row_i , col_i ;
-genotype_i = row_i = col_i = 0;
-
-for (row_i = 0; row_i < 2; row_i++)
-{
-  for (col_i = 0; col_i < 2; col_i++)
-  {
-    for (genotype_i = 0; genotype_i < 3; genotype_i++)
-    {
-      temp_values[row_i % board_size][col_i % board_size][genotype_i] = b[row_i % board_size, col_i % board_size, genotype_i];
-    }
-  }
-}
-
-long int row1 = ((int) row + 1) % board_size;
-long int col1 = ((int) col + 1) % board_size;
-/*
-for (int i; i < 2; i++)
-{
-  for (int j; i < 2; j++)
-  {
-    for (int g; g < 3; g++)
-    {
-      printf("%d", b[i, j, g]);
-    }
-    printf(" ");
-  }
-  printf("\n");
-}
-*/
-if (d < 0.5)
-{
-  for (genotype_i = 0; genotype_i < 3; genotype_i++)
-  {
-    b[ row , col , genotype_i ] = temp_values[ row , col1, genotype_i ]; // anticlockwise index map
-    b[ row , col1, genotype_i ] = temp_values[ row1, col1, genotype_i ]; // 00 01 -> 01 11
-    b[ row1, col , genotype_i ] = temp_values[ row , col , genotype_i ]; // 10 11 -> 00 10
-    b[ row1, col1, genotype_i ] = temp_values[ row1, col , genotype_i ];
-  }
-}
-else
-{
-  for (genotype_i = 0; genotype_i < 3; genotype_i++)
-  {
-    b[ row , col , genotype_i ] = temp_values[ genotype_i, row1, col  ]; // clockwise index map
-    b[ row , col1, genotype_i ] = temp_values[ genotype_i, row , col  ]; // 00 01 -> 10 00
-    b[ row1, col , genotype_i ] = temp_values[ genotype_i, row1, col1 ]; // 10 11 -> 11 01
-    b[ row1, col1, genotype_i ] = temp_values[ genotype_i, row , col1 ];
-  }
-}
-/*
-for (int i; i < 2; i++)
-{
-  for (int j; i < 2; j++)
-  {
-    for (int g; g < 3; g++)
-    {
-      printf("%d", b[g, i, j]);
-    }
-    printf(" ");
-  }
-  printf("\n");
-}
-*/
-'''
-        row, col = position
-        temp_values = sp.empty((3,2,2), dtype=sp.bool_)
-        
-        sp.weave.inline(diffuse_code, ['board_size',
-                                       'board',
-                                       'row',
-                                       'col',
-                                       'direction',
-                                       'temp_valuee'],
-                                       {'board_size': self.board_edge_length,
-                                        'board': self.board,
-                                        'row': row,
-                                        'col': col,
-                                        'direction': direction,
-                                        'temp_value': temp_values })
-        
     def save_h5(self):
-
         """
         Saves the attributes of self whose names show up as keys in self.parameters.
         """
-
         with h5py.File(self.fname) as ff:
             for key in self.parameters:
                 try:
@@ -529,36 +432,36 @@ for (int i; i < 2; i++)
     
     def sample(self):
         joint_board = self.board[:, :, 0] + 2 * self.board[:, :, 1] + 4 * self.board[:, :, 2]
-        for genotype in range(8):
-            genotype_board = joint_board == genotype
-            genotype_frequency = sp.sum(genotype_board)
+        for gene in range(8):
+            gene_board = joint_board == gene
+            gene_frequency = sp.sum(gene_board)
             # neighbours_genotype
-            for nh_genotype in range(8):
-                nh_board = joint_board == nh_genotype
-                nh_genotype_count = sp.signal.convolve2d(nh_board, sp.ones((3,3)), mode='same', boundary='wrap')
-                nh_genotype_count_of_genotype = sp.sum(nh_genotype_count * genotype_board, dtype=sp.int64)
-                self.samples_nhood[self.sample_count, genotype, nh_genotype] = nh_genotype_count_of_genotype
-            self.samples_frequency[self.sample_count, genotype] = genotype_frequency
+            for nh_gene in range(8):
+                nh_board = joint_board == nh_gene
+                nh_gene_count = sp.signal.convolve2d(nh_board, sp.ones((3,3)), mode='same', boundary='wrap')
+                nh_gene_count_of_gene = sp.sum(nh_gene_count * gene_board, dtype=sp.int64)
+                self.samples_nhood[self.sample_count, gene, nh_gene] = nh_gene_count_of_gene
+            self.samples_frequency[self.sample_count, gene] = gene_frequency
         self.sample_count += 1
 
     def nextstep(self):
         print 'generation:', self.step_count
-        for i in range(self.board_edge_length ** 2):
+        for i in range(self.board_size ** 2):
             print 'competition:', i
             ##
             # Draw two adjacent positions.
             # We'll use relative positions to compute exact positions of 2nd competitor cell
-            pos1 = sp.random.randint(self.board_edge_length, size=2)
+            pos1 = sp.random.randint(self.board_size, size=2)
             pos2 = pos1 + self.NEIGHBOUR_REL_POS[sp.random.randint(4)]
             p_pair = sp.rand(2)
             winner_pos, loser_pos = self.competition(pos1, pos2, p_pair)
             self.copycell(winner_pos, loser_pos)
             self.mutate(loser_pos)
-        for i in range(sp.int64((self.board_edge_length ** 2) * self.diffusion_amount // 4)):
+        for i in range(sp.int64((self.board_size ** 2) * self.diffusion_amount // 4)):
             print 'diffusion: {0}'.format(i)
             direction = sp.rand()
-            position = sp.random.randint(self.board_edge_length, size=2)
-            self.diffuse(direction, position)
+            position = sp.random.randint(self.board_size, size=2)
+            rotquad90(self.board, direction, position)
         if not self.step_count % self.steps_per_sample:
             self.sample()
         if not self.step_count % self.steps_per_board_sample:
@@ -633,19 +536,22 @@ def assert_shape(arr, shape):
     assert arr.shape == shape, 'Wrong shape\nExists {0} but {1} is wanted.'.format(arr.shape, shape)
 
 default_config = {
-        'S_cost':             1, # Metabolic cost of signalling
-        'R_Metabolic cost':   3, # Metabolic cost of having a receptor
-        'C_Metabolic cost':  30, # Metabolic cost of being cooperative
-        'metabolic_baseline':           100, # Basal metabolic cost
-        'benefit':          0.9, # The fraction reduced, out of total metabolic cost, when
-                                 #    public goods reach threshold of benefit.
-        # Likelihoods of switch (on to off and vica versa) for each gene per cell per generation.
-        'mutation_rate_r': 1e-4,
-        'mutation_rate_s': 1e-4,
-        'mutation_rate_c': 1e-4,
+        'S_cost':                1,   # Metabolic cost of signalling
+        'R_cost':                3,   # Metabolic cost of having a receptor
+        'C_cost':                30,  # Metabolic cost of being cooperative
+        'metabolic_baseline':    100, # Basal metabolic cost
+
+        'benefit':               0.9, # The fraction reduced, out of total metabolic cost, when
+                                      #    public goods reach threshold of benefit.
+        
+        'mutation_rate_r': 1e-4, # Likelihoods of switch (on to off and vica versa) for each gene per cell per generation.
+        'mutation_rate_s': 1e-4, #
+        'mutation_rate_c': 1e-4, # 
+
         'S_th':               3, # Amount of signal needed for a receptive and cooperative cell to
                                  #    start producing public goods.
         'C_th':               3, # Amount of public goods needed for metabolic benefit.
+
         'diffusion_amount': 0.5, # Average fraction of cells out of total cells on the board (board_size**2)
                                  #    which will be involved
         'board_size':        10, # The length of the board. The board will be of shape (board_size, board_size).
@@ -672,4 +578,110 @@ def load_config(config_filename):
         our_config[key] = config.get('Config', key)
 
     return our_config
+
+def rotquad90(board, direction, position):
+    """
+    rotquad90(self, direction, position) -> NoneType
+
+    Turns a 2 by 2 sub-array of self.board by 90 degrees.
+    Direction:
+        0 - turn anticlockwise
+        1 - turn clockwise
+    with its lowest valued coordinate (upper left) in the "position" coordinate value.
+    """
+    inline_code = r'''
+long int temp_value;
+
+long int row_i, col_i, gene_i;
+row_i = col_i = gene_i = 0;
+
+long int row0, col0;
+row0 = POSITION1(0);
+col0 = POSITION1(1);
+
+long int row1 = (row0 + 1) % Nboard[0];
+long int col1 = (row0 + 1) % Nboard[1];
+/*
+for (int row_i = 0; row_i < 2; row_i++)
+{
+  for (int col_i = 0; col_i < 2; col_i++)
+  {
+    for (int gene_i = 0; gene_i < 3; gene_i++)
+    {
+      printf("%d", BOARD((row_i+row0) % Nboard[0],
+                         (col_i+col0) % Nboard[1],
+                         gene_i));
+    }
+    printf(" ");
+  }
+  printf("\n");
+}
+*/
+if (direction == 0)
+{
+  for (gene_i = 0; gene_i < 3; gene_i++)
+  {
+    temp_value = BOARD3(row0, col0, gene_i);                   // A  B
+                                                               // C  D
+
+    BOARD3(row0, col0, gene_i) = BOARD3(row0, col1, gene_i);   // B  B
+                                                               // C  D
+
+    BOARD3(row0, col1, gene_i) = BOARD3(row1, col1, gene_i);   // B  D
+                                                               // C  D
+
+    BOARD3(row1, col1, gene_i) = BOARD3(row1, col0, gene_i);   // B  D
+                                                               // C  C
+
+    BOARD3(row1, col0, gene_i) = temp_value;                   // B  C
+                                                               // A  D
+  }
+}
+else
+{
+  for (gene_i = 0; gene_i < 3; gene_i++)
+  {
+    temp_value = BOARD3(row0, col0, gene_i);                 // A  B
+                                                             // C  D
+                                                             
+    BOARD3(row0, col0, gene_i) = BOARD3(row1, col0, gene_i); // C  B
+                                                             // C  D
+                                                             
+    BOARD3(row1, col0, gene_i) = BOARD3(row1, col1, gene_i); // C  B
+                                                             // D  D
+                                                             
+    BOARD3(row1, col1, gene_i) = BOARD3(row0, col1, gene_i); // C  B
+                                                             // D  B
+                                                             
+    BOARD3(row0, col1, gene_i) = temp_value;                 // C  A
+                                                             // D  B
+  }
+}
+/*
+for (int row_i = 0; row_i < 2; row_i++)
+{
+  for (int col_i = 0; col_i < 2; col_i++)
+  {
+    for (int gene_i = 0; gene_i < 3; gene_i++)
+    {
+      printf("%d", BOARD((row0 + row_i) % Nboard[0],
+                         (col0 + col_i) % Nboard[1],
+                         gene_i));
+    }
+    printf(" ");
+  }
+  printf("\n");
+}
+*/
+'''
+    sp.weave.inline(inline_code, ['board',
+                                  'position',
+                                  'direction',
+                                  'row_board_size',
+                                  'col_board_size'],
+                                 {'board': board,
+                                  'position': position,
+                                  'direction': direction,
+                                  'row_board_size': board.shape[0] ** 3,
+                                  'col_board_size': board.shape[1] ** 2})
 

@@ -1,4 +1,4 @@
-import strife
+import strife.strife as strife
 import scipy as sp
 import sys
 import os
@@ -43,11 +43,11 @@ if __name__ == '__main__':
               conf_filename = sys.argv[i+1]
               config = strife.load_config(conf_filename)
       if os.path.exists(config['data_filename']):
-          game = strife.gameOfStrife()
+          game = strife.Strife()
           game.load_h5()
           go(game)
       else:
-          game = strife.gameOfStrife(config)
+          game = strife.Strife(config)
           game.save_h5()
           go(game)
       game.save_h5()
