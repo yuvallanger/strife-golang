@@ -126,7 +126,7 @@ class Strife:
         d['steps_per_board_sample'] = sp.int64(10 * d['steps_per_sample'])
         d['sample_count'] = sp.int64(0)
         # We want to know the frequency of each genotype per generation
-        d['samples_frequency'] = sp.empty((d['samples_num'], d['genotype_num']), dtype='int32')
+        d['samples_frequency'] = sp.empty((d['samples_num'], d['genotype_num']), dtype='int64')
         d['samples_nhood'] = sp.empty((d['samples_num'], d['genotype_num'], d['genotype_num']), dtype=sp.int64)
         d['samples_board'] = sp.empty((d['samples_board_num'], d['board_size'], d['board_size'], 3), dtype=sp.int64)
        
@@ -157,21 +157,26 @@ class Strife:
         Acts like scipy.signal.convolve2d with mode = 'valid', except that it only counts, does not convolves.
         """
         count_neighbors_code = r'''
-long signed int row_i, col_i;
+long row_i, col_i;
 long count = 0;
 long row_torus;
 long col_torus;
 long row_center, col_center;
 
+printf("poop\n");
 for (row_center = ROWS1(0); row_center <= ROWS1(1); row_center++)
 {
-    for (col_center = COLS1(0); col_center <= COLS(1); col_center++)
+printf("row_center: %ld\n", row_center);
+    for (col_center = COLS1(0); col_center <= COLS1(1); col_center++)
     {
+    printf("col_center: %ld\n", col_center);
         count = 0;
         for (row_i = row_center-radius; row_i <= row_center+radius; row_i++)
         {
+        printf("row_i: %ld\n", row_i);
             for (col_i = col_center-radius; col_i <= col_center+radius; col_i++)
             {
+            printf("col_i: %ld\n", col_i);
                 row_torus = row_i%Nboard[0];
                 col_torus = col_i%Nboard[1];
         /*        printf("gene: %d; ", gene);
@@ -182,23 +187,24 @@ for (row_center = ROWS1(0); row_center <= ROWS1(1); row_center++)
                 */
 
 
+                printf("count: %ld\n", count);
                 if ((BOARD3(row_torus, col_torus, gene)) == allele)
                 {
                     count++;
                 }
-                /*
-                printf("count: %d; ", count);
-                printf("\n");
-                */
+                printf("count: %ld\n", count);
             }
         }
-        SUM_BOARD(row_center % Nboard[0] - ROWS1(0) % Nboard(0), col_center % Nboard[1] - COLS1(0) % Nboard(1)) = counter
+        printf("row_center - ROWS1(0): %ld\ncol_center - COLS1(0): %ld\n", row_center - ROWS1(0), col_center - COLS1(0));
+        SUM_BOARD2(row_center - ROWS1(0),
+                   col_center - COLS1(0)) = count;
     }
 }
 
 return_val = count;
 '''
-        sum_board = scipy.empty((self.board.shape[0]-radius, self.board.shape[1]-radius))
+        sum_board = scipy.empty((rows[1] - rows[0] - 2*radius, cols[2] - cols[0] - 2*radius))
+        print(sum_board.shape)
         return sp.weave.inline(count_neighbors_code,
                         ['rows', 'cols', 'gene', 'allele', 'board', 'radius', 'sum_board'],
                         {'rows': rows, 'cols': cols, 'gene': gene, 'allele': allele, 'board': self.board, 'sum_board': sum_board, 'radius': radius })
@@ -350,11 +356,11 @@ shape: {1}'''.format(C_conv.shape, shape)
                 # 2
                 # 1
                 if score1 > score2:
-                    #print "comp 2 wins"
+                    #print("comp 2 wins")
                     # competitor 2 wins
                     return (c_pos_2t, c_pos_1)
                 else:
-                    #print "comp 1 wins"
+                    #print("comp 1 wins")
                     # competitor 1 wins
                     return (c_pos_1, c_pos_2t)
             else:
@@ -362,11 +368,11 @@ shape: {1}'''.format(C_conv.shape, shape)
                 # 1
                 # 2
                 if score1 > score2:
-                    #print "comp 1 wins"
+                    #print("comp 1 wins")
                     # competitor 1 wins
                     return (c_pos_1, c_pos_2t)
                 else:
-                    #print "comp 2 wins"
+                    #print("comp 2 wins")
                     # competitor 2 wins
                     return (c_pos_2t, c_pos_1)
         else:
@@ -375,7 +381,7 @@ shape: {1}'''.format(C_conv.shape, shape)
                 # their position is like this:
                 # 2 1
                 if score1 > score2:
-                    #print "comp 2 wins"
+                    #print("comp 2 wins")
                     # competitor 2 wins
                     return (c_pos_2t, c_pos_1)
                 else:
@@ -385,11 +391,11 @@ shape: {1}'''.format(C_conv.shape, shape)
                 # their position is like this:
                 # 1 2
                 if score1 > score2:
-                    #print "comp 1 wins"
+                    #print("comp 1 wins")
                     # competitor 1 wins
                     return (c_pos_1, c_pos_2t)
                 else:
-                    #print "comp 2 wins"
+                    #print("comp 2 wins")
                     # competitor 2 wins
                     return (c_pos_2t, c_pos_1)
     
@@ -423,7 +429,7 @@ shape: {1}'''.format(C_conv.shape, shape)
         with h5py.File(self.fname) as ff:
             for key in self.parameters:
                 try:
-                    print key, type(getattr(self, key))
+                    print(key, type(getattr(self, key)))
                     ff[key] = getattr(self, key)
                 except:
                     ff[key][...] = getattr(self, key)
@@ -448,9 +454,9 @@ shape: {1}'''.format(C_conv.shape, shape)
         self.sample_count += 1
 
     def nextstep(self):
-        print 'generation:', self.step_count
+        print('generation:', self.step_count)
         for i in range(self.board_size ** 2):
-            print 'competition:', i
+            print('competition:', i)
             ##
             # Draw two adjacent positions.
             # We'll use relative positions to compute exact positions of 2nd competitor cell
@@ -461,7 +467,7 @@ shape: {1}'''.format(C_conv.shape, shape)
             self.copycell(winner_pos, loser_pos)
             self.mutate(loser_pos)
         for i in range(sp.int64((self.board_size ** 2) * self.diffusion_amount // 4)):
-            print 'diffusion: {0}'.format(i)
+            print('diffusion: {0}'.format(i))
             direction = sp.rand()
             position = sp.random.randint(self.board_size, size=2)
             rotquad90(self.board, direction, position)
@@ -508,7 +514,7 @@ def go(a):
     t = time.time()
     every = 30*60
     # TODO: Maybe add f and d somehow like in printf? {0}f {1}d
-    print "t: {0:f}, steps thus far: {1:d}".format(t, a.step_count)
+    print("t: {0:f}, steps thus far: {1:d}".format(t, a.step_count))
     steps_a = a.step_count
     while a.step_count <= a.generations:
         a.nextstep()
@@ -519,16 +525,16 @@ def go(a):
             steps_delta = a.step_count - steps_a
             steps_a = a.step_count
             eta = 1.0 * delta_t / (steps_delta+1) * (a.steps_final - a.step_count)
-            print "t: {0:f}, approx. time to fin: {1:f}".format(t, eta)
-            print "steps taken = {0}, steps since last save = {1}".format(a.step_count, steps_delta)
+            print("t: {0:f}, approx. time to fin: {1:f}".format(t, eta))
+            print("steps taken = {0}, steps since last save = {1}".format(a.step_count, steps_delta))
             sys.exit(1)
 
 # TODO: Handler of signals.
 def handler_maker(a_game):
     def handler(signum, frame):
-        print 'Signal handler called with signal', signum
+        print('Signal handler called with signal', signum)
         a_game.save_h5()
-        print 'game saved'
+        print('game saved')
         raise
     return handler
 
@@ -607,73 +613,73 @@ long int col1 = (row0 + 1) % Nboard[1];
 /*
 for (int row_i = 0; row_i < 2; row_i++)
 {
-  for (int col_i = 0; col_i < 2; col_i++)
-  {
-    for (int gene_i = 0; gene_i < 3; gene_i++)
+    for (int col_i = 0; col_i < 2; col_i++)
     {
-      printf("%d", BOARD((row_i+row0) % Nboard[0],
-                         (col_i+col0) % Nboard[1],
-                         gene_i));
-    }
+        for (int gene_i = 0; gene_i < 3; gene_i++)
+        {
+        printf("%d", BOARD((row_i+row0) % Nboard[0],
+                            (col_i+col0) % Nboard[1],
+                            gene_i));
+        }
     printf(" ");
-  }
-  printf("\n");
+    }
+    printf("\n");
 }
 */
 if (direction == 0)
 {
-  for (gene_i = 0; gene_i < 3; gene_i++)
-  {
-    temp_value = BOARD3(row0, col0, gene_i);                   // A  B
-                                                               // C  D
+    for (gene_i = 0; gene_i < 3; gene_i++)
+    {
+        temp_value = BOARD3(row0, col0, gene_i);                   // A  B
+                                                                   // C  D
 
-    BOARD3(row0, col0, gene_i) = BOARD3(row0, col1, gene_i);   // B  B
-                                                               // C  D
+        BOARD3(row0, col0, gene_i) = BOARD3(row0, col1, gene_i);   // B  B
+                                                                   // C  D
 
-    BOARD3(row0, col1, gene_i) = BOARD3(row1, col1, gene_i);   // B  D
-                                                               // C  D
+        BOARD3(row0, col1, gene_i) = BOARD3(row1, col1, gene_i);   // B  D
+                                                                   // C  D
 
-    BOARD3(row1, col1, gene_i) = BOARD3(row1, col0, gene_i);   // B  D
-                                                               // C  C
+        BOARD3(row1, col1, gene_i) = BOARD3(row1, col0, gene_i);   // B  D
+                                                                   // C  C
 
-    BOARD3(row1, col0, gene_i) = temp_value;                   // B  C
-                                                               // A  D
-  }
+        BOARD3(row1, col0, gene_i) = temp_value;                   // B  C
+                                                                   // A  D
+    }
 }
 else
 {
-  for (gene_i = 0; gene_i < 3; gene_i++)
-  {
-    temp_value = BOARD3(row0, col0, gene_i);                 // A  B
-                                                             // C  D
-                                                             
-    BOARD3(row0, col0, gene_i) = BOARD3(row1, col0, gene_i); // C  B
-                                                             // C  D
-                                                             
-    BOARD3(row1, col0, gene_i) = BOARD3(row1, col1, gene_i); // C  B
-                                                             // D  D
-                                                             
-    BOARD3(row1, col1, gene_i) = BOARD3(row0, col1, gene_i); // C  B
-                                                             // D  B
-                                                             
-    BOARD3(row0, col1, gene_i) = temp_value;                 // C  A
-                                                             // D  B
-  }
+    for (gene_i = 0; gene_i < 3; gene_i++)
+    {
+        temp_value = BOARD3(row0, col0, gene_i);                 // A  B
+                                                                 // C  D
+                                                                 
+        BOARD3(row0, col0, gene_i) = BOARD3(row1, col0, gene_i); // C  B
+                                                                 // C  D
+                                                                 
+        BOARD3(row1, col0, gene_i) = BOARD3(row1, col1, gene_i); // C  B
+                                                                 // D  D
+                                                                 
+        BOARD3(row1, col1, gene_i) = BOARD3(row0, col1, gene_i); // C  B
+                                                                 // D  B
+                                                                 
+        BOARD3(row0, col1, gene_i) = temp_value;                 // C  A
+                                                                 // D  B
+    }
 }
 /*
 for (int row_i = 0; row_i < 2; row_i++)
 {
-  for (int col_i = 0; col_i < 2; col_i++)
-  {
-    for (int gene_i = 0; gene_i < 3; gene_i++)
+    for (int col_i = 0; col_i < 2; col_i++)
     {
-      printf("%d", BOARD((row0 + row_i) % Nboard[0],
-                         (col0 + col_i) % Nboard[1],
-                         gene_i));
+        for (int gene_i = 0; gene_i < 3; gene_i++)
+        {
+            printf("%d", BOARD((row0 + row_i) % Nboard[0],
+                               (col0 + col_i) % Nboard[1],
+                               gene_i));
+        }
+        printf(" ");
     }
-    printf(" ");
-  }
-  printf("\n");
+    printf("\n");
 }
 */
 '''
