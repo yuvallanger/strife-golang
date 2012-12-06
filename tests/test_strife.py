@@ -50,11 +50,12 @@ class TestCountNV(unittest.TestCase):
                                      [1, 1, 0, 1],
                                      [0, 1, 1, 0],
                                      [1, 1, 1, 1]]], dtype='int64').transpose(1,2,0)
-        sum_board = a_game.count_neighbors_valid(rows   = scipy.array([0, 3]),
-                                                 cols   = scipy.array([0, 3]),
-                                                 gene   = 0,
-                                                 allele = 1,
-                                                 radius = 1)
+        sum_board = a_game.count_neighbors(rows   = scipy.array([0, 2]),
+                                           cols   = scipy.array([0, 2]),
+                                           gene   = 0,
+                                           allele = 1,
+                                           radius = 1)
+        print("sumboard, array", sum_board, scipy.array([[5], [7]]))
         self.assertEqual((scipy.array([[5], [7]]) == sum_board).all(), True)
 
 #class TestCountNeighbors(TestStrife):

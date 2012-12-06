@@ -149,12 +149,20 @@ class Strife:
     ######
     ## functions
     ######    
-    def count_neighbors_valid(self, rows, cols, gene, allele, radius):
+    def count_neighbors(self, rows, cols, gene, allele, radius):
         """
         Counts all neighbors that have "allele" as their "gene" at a Moore's "radius" around each cell that lies between
           rows[0] and rows[1] and between cols[0] and cols[1], inclusive.
         
         Acts like scipy.signal.convolve2d with mode = 'valid', except that it only counts, does not convolves.
+        
+        0 1 2 3 4
+        cols = [1 3)
+        center = [1,3)
+        col_i = [c-r, c+r+1)
+        sum_board = (cols1-cols0, )
+        count[col_i % N + N]
+        sum_board[c] = count
         """
         count_neighbors_code = r'''
 long row_i, col_i;
@@ -163,32 +171,30 @@ long row_torus;
 long col_torus;
 long row_center, col_center;
 
-printf("poop\n");
-for (row_center = ROWS1(0); row_center <= ROWS1(1); row_center++)
+for (row_center = ROWS1(0); row_center < ROWS1(1); row_center++)
 {
 printf("row_center: %ld\n", row_center);
-    for (col_center = COLS1(0); col_center <= COLS1(1); col_center++)
+    for (col_center = COLS1(0); col_center < COLS1(1); col_center++)
     {
     printf("col_center: %ld\n", col_center);
         count = 0;
-        for (row_i = row_center-radius; row_i <= row_center+radius; row_i++)
+        for (row_i = row_center - radius; row_i < row_center + radius + 1; row_i++)
         {
         printf("row_i: %ld\n", row_i);
-            for (col_i = col_center-radius; col_i <= col_center+radius; col_i++)
+            for (col_i = col_center - radius; col_i < col_center + radius + 1; col_i++)
             {
             printf("col_i: %ld\n", col_i);
-                row_torus = row_i%Nboard[0];
-                col_torus = col_i%Nboard[1];
-        /*        printf("gene: %d; ", gene);
-                printf("board[%d, %d, %d]: %d; ", row_i, col_i, allele, BOARD3(row_i%Nboard[0], col_i%Nboard[1], gene));
+                row_torus = row_i % Nboard[0] + Nboard[0];
+                col_torus = col_i % Nboard[1] + Nboard[1];
+                printf("gene: %d; ", gene);
+                printf("board[%d, %d, %d]: %d; ", row_i_torus, col_i_torus, gene, BOARD3(row_i_torus, col_i_torus, gene));
                 printf("shape: (%d, %d); ", Nboard[0], Nboard[1]);
                 printf("count: %d; ", count);
                 printf("\n");
-                */
 
 
                 printf("count: %ld\n", count);
-                if ((BOARD3(row_torus, col_torus, gene)) == allele)
+                if ((BOARD3(row_i_torus, col_i_torus, gene)) == allele)
                 {
                     count++;
                 }
@@ -196,18 +202,17 @@ printf("row_center: %ld\n", row_center);
             }
         }
         printf("row_center - ROWS1(0): %ld\ncol_center - COLS1(0): %ld\n", row_center - ROWS1(0), col_center - COLS1(0));
-        SUM_BOARD2(row_center - ROWS1(0),
-                   col_center - COLS1(0)) = count;
+        SUM_BOARD2((row_center - ROWS1(0)) % Nboard[0] + Nboard[0],
+                   col_center % Nboard[1] + Nboard[1]) = count;
     }
 }
-
-return_val = count;
 '''
-        sum_board = scipy.empty((rows[1] - rows[0] - 2*radius, cols[2] - cols[0] - 2*radius))
+        sum_board = scipy.empty((rows[1] - rows[0], cols[1] - cols[0]), dtype=sp.int64)
         print(sum_board.shape)
-        return sp.weave.inline(count_neighbors_code,
+        sp.weave.inline(count_neighbors_code,
                         ['rows', 'cols', 'gene', 'allele', 'board', 'radius', 'sum_board'],
                         {'rows': rows, 'cols': cols, 'gene': gene, 'allele': allele, 'board': self.board, 'sum_board': sum_board, 'radius': radius })
+        return sum_board
 
 #    @profile
     def competition(self, c_pos_1, c_pos_2, p_pair):
@@ -674,7 +679,7 @@ for (int row_i = 0; row_i < 2; row_i++)
         for (int gene_i = 0; gene_i < 3; gene_i++)
         {
             printf("%d", BOARD((row0 + row_i) % Nboard[0],
-                               (col0 + col_i) % Nboard[1],
+                               col0 + col_i) % Nboard[1],
                                gene_i));
         }
         printf(" ");
