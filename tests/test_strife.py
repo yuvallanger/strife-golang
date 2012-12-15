@@ -43,7 +43,7 @@ class TestTruth(unittest.TestCase):#Strife):
         self.assertEqual(inline(inline_code.format(0), ['t']), 0)
         self.assertEqual(inline(inline_code.format(1), ['t']), 1)
 
-class TestCountNV(unittest.TestCase):
+class TestCount(unittest.TestCase):
     def test_count(self):
         a_game = strife.strife.strife.Strife()
         a_game.board = scipy.array([[[1, 0, 0, 1],
@@ -70,20 +70,6 @@ class TestCountNV(unittest.TestCase):
                                            radius = 1)
         print("sumboard, array", sum_board, scipy.array([[5], [7]]))
         self.assertEqual((scipy.array([[5], [7]]) == sum_board).all(), True)
-
-#class TestCountNeighbors(TestStrife):
-#    def test_count_neighbors_0_0(self):
-#        self.assertEqual(self.a_game.count_neighbors_valid(1,1,0,0,1), 8)
-#    def test_count_neighbors_0_1(self):
-#        self.assertEqual(self.a_game.count_neighbors_valid(1,1,0,1,1), 1)
-#    def test_count_neighbors_1_0(self):
-#        self.assertEqual(self.a_game.count_neighbors_valid(1,1,1,0,1), 4)
-#    def test_count_neighbors_1_1(self):
-#        self.assertEqual(self.a_game.count_neighbors_valid(1,1,1,1,1), 5)
-#    def test_count_neighbors_2_0(self):
-#        self.assertEqual(self.a_game.count_neighbors_valid(1,1,2,0,1), 6)
-#    def test_count_neighbors_2_1(self):
-#        self.assertEqual(self.a_game.count_neighbors_valid(1,1,2,1,1), 3)
 
 class TestDiffuse2by2(TestStrife):
     def test_diffuse(self):
@@ -202,64 +188,74 @@ class TestDiffuse3by3Modulus(TestStrife):
         board_a = scipy.arange(4*4).reshape(4,4)
         board_b = scipy.arange(4*4, 4*4*2).reshape(4,4)
         board_c = scipy.arange(4*4*2, 4*4*3).reshape(4,4)
+
         board_0 = scipy.array([board_a, board_b, board_c]).transpose(1,2,0)
         self.a_game.board = board_0.copy()
+
         strife.strife.strife.rotquad90(self.a_game.board, 0, scipy.array((3, 3)))
         board_90 = self.a_game.board.copy()
+
         strife.strife.strife.rotquad90(self.a_game.board, 0, scipy.array((3, 3)))
         board_180 = self.a_game.board.copy()
+
         strife.strife.strife.rotquad90(self.a_game.board, 0, scipy.array((3, 3)))
         board_270 = self.a_game.board.copy()
+
         strife.strife.strife.rotquad90(self.a_game.board, 0, scipy.array((3, 3)))
         board_360 = self.a_game.board.copy()
-        priori_board_90 = scipy.array([scipy.array([[ 3,  1,  2, 15],
-                                                    [ 4,  5,  6,  7],
-                                                    [ 8,  9, 10, 11],
-                                                    [ 0, 13, 14, 12]]),
-                                       scipy.array([[19, 17, 18, 31],
-                                                    [20, 21, 22, 23],
-                                                    [24, 25, 26, 27],
-                                                    [16, 29, 30, 28]]),
-                                       scipy.array([[35, 33, 34, 47],
-                                                    [36, 37, 38, 39],
-                                                    [40, 41, 42, 43],
-                                                    [32, 45, 46, 44]])]).transpose(1,2,0)
-        priori_board_180 = scipy.array([scipy.array([[15,  1,  2, 12],
-                                                     [ 4,  5,  6,  7],
-                                                     [ 8,  9, 10, 11],
-                                                     [ 3, 13, 14,  0]]),
-                                        scipy.array([[31, 17, 18, 28],
-                                                     [20, 21, 22, 23],
-                                                     [24, 25, 26, 27],
-                                                     [19, 29, 30, 16]]),
-                                        scipy.array([[47, 33, 34, 44],
-                                                     [36, 37, 38, 39],
-                                                     [40, 41, 42, 43],
-                                                     [35, 45, 46, 32]])]).transpose(1,2,0)
-        priori_board_270 = scipy.array([scipy.array([[12,  1,  2,  0],
-                                                     [ 4,  5,  6,  7],
-                                                     [ 8,  9, 10, 11],
-                                                     [15, 13, 14,  3]]),
-                                        scipy.array([[28, 17, 18, 16],
-                                                     [20, 21, 22, 23],
-                                                     [24, 25, 26, 27],
-                                                     [31, 29, 30, 19]]),
-                                        scipy.array([[44, 33, 34, 32],
-                                                     [36, 37, 38, 39],
-                                                     [40, 41, 42, 43],
-                                                     [47, 45, 46, 35]])]).transpose(1,2,0)
-        priori_board_360 = scipy.array([scipy.array([[ 0,  1,  2,  3],
-                                                     [ 4,  5,  6,  7],
-                                                     [ 8,  9, 10, 11],
-                                                     [12, 13, 14, 15]]),
-                                        scipy.array([[16, 17, 18, 19],
-                                                     [20, 21, 22, 23],
-                                                     [24, 25, 26, 27],
-                                                     [28, 29, 30, 31]]),
-                                        scipy.array([[32, 33, 34, 35],
-                                                     [36, 37, 38, 39],
-                                                     [40, 41, 42, 43],
-                                                     [44, 45, 46, 47]])]).transpose(1,2,0)
+
+        priori_board_90 = scipy.array([[[ 3,  1,  2, 15],
+                                        [ 4,  5,  6,  7],
+                                        [ 8,  9, 10, 11],
+                                        [ 0, 13, 14, 12]],
+                                       [[19, 17, 18, 31],
+                                        [20, 21, 22, 23],
+                                        [24, 25, 26, 27],
+                                        [16, 29, 30, 28]],
+                                       [[35, 33, 34, 47],
+                                        [36, 37, 38, 39],
+                                        [40, 41, 42, 43],
+                                        [32, 45, 46, 44]]]).transpose(1,2,0)
+
+        priori_board_180 = scipy.array([[[15,  1,  2, 12],
+                                         [ 4,  5,  6,  7],
+                                         [ 8,  9, 10, 11],
+                                         [ 3, 13, 14,  0]],
+                                        [[31, 17, 18, 28],
+                                         [20, 21, 22, 23],
+                                         [24, 25, 26, 27],
+                                         [19, 29, 30, 16]],
+                                        [[47, 33, 34, 44],
+                                         [36, 37, 38, 39],
+                                         [40, 41, 42, 43],
+                                         [35, 45, 46, 32]]]).transpose(1,2,0)
+
+        priori_board_270 = scipy.array([[[12,  1,  2,  0],
+                                         [ 4,  5,  6,  7],
+                                         [ 8,  9, 10, 11],
+                                         [15, 13, 14,  3]],
+                                        [[28, 17, 18, 16],
+                                         [20, 21, 22, 23],
+                                         [24, 25, 26, 27],
+                                         [31, 29, 30, 19]],
+                                        [[44, 33, 34, 32],
+                                         [36, 37, 38, 39],
+                                         [40, 41, 42, 43],
+                                         [47, 45, 46, 35]]]).transpose(1,2,0)
+
+        priori_board_360 = scipy.array([[[ 0,  1,  2,  3],
+                                         [ 4,  5,  6,  7],
+                                         [ 8,  9, 10, 11],
+                                         [12, 13, 14, 15]],
+                                        [[16, 17, 18, 19],
+                                         [20, 21, 22, 23],
+                                         [24, 25, 26, 27],
+                                         [28, 29, 30, 31]],
+                                        [[32, 33, 34, 35],
+                                         [36, 37, 38, 39],
+                                         [40, 41, 42, 43],
+                                         [44, 45, 46, 47]]]).transpose(1,2,0)
+
         self.assertEqual((board_90  == priori_board_90 ).all(), True)
         self.assertEqual((board_180 == priori_board_180).all(), True)
         self.assertEqual((board_270 == priori_board_270).all(), True)
