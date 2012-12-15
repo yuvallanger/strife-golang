@@ -7,7 +7,7 @@ http://www.plosone.org/article/info:doi/10.1371/journal.pone.0006655
 """
 
 import h5py
-import os
+#import os
 import time
 import scipy as sp
 import scipy.signal
@@ -74,6 +74,17 @@ class Strife:
         # radius of Signal or Cooperation effects.
         d['S_rad'] = sp.int64(config['S_rad'])
         d['C_rad'] = sp.int64(config['C_rad'])
+        
+        #######
+        # We don't want to create these again and again while counting for each competition.
+        d['horizontal_s_count'] = sp.empty(2 + 2 * d['S_rad'] + 2 * d['C_rad'],
+                                           1 + 2 * d['S_rad'] + 2 * d['C_rad'])
+        d['vertical_s_count'] = sp.empty(2 + 2 * d['S_rad'] + 2 * d['C_rad'],
+                                         1 + 2 * d['S_rad'] + 2 * d['C_rad'])
+        d['horizontal_c_count'] = sp.empty(2 + 2 * d['C_rad'],
+                                           1 + 2 * d['C_rad'])
+        d['vertical_c_count'] = sp.empty(2 + 2 * d['C_rad'],
+                                         1 + 2 * d['C_rad'])
        
         d['generations'] = sp.int64(config['generations'])
 
@@ -155,55 +166,93 @@ class Strife:
           rows[0] and rows[1] and between cols[0] and cols[1], inclusive.
         
         Acts like scipy.signal.convolve2d with mode = 'valid', except that it only counts, does not convolves.
-        
-        0 1 2 3 4
-        cols = [1 3)
-        center = [1,3)
-        col_i = [c-r, c+r+1)
-        sum_board = (cols1-cols0, )
-        count[col_i % N + N]
-        sum_board[c] = count
         """
         count_neighbors_code = r'''
-long row_i, col_i;
+long nh_row_i, nh_col_i;
 long count = 0;
-long row_torus;
-long col_torus;
+long nh_row_i_torus; // nh stands for neighborhood
+long nh_col_i_torus;
 long row_center, col_center;
+
+/* 
+        board = array([0, 1, 2, 3, 4])
+        I want sums of 3, 4 and 5 so
+        The range of cells we want to have sums of neighbors is denoted in "cols".
+        Lower is inclusive. Higher is exclusive.
+            cols = [3 6)
+        The integers we span in the outer loop are exactly the ones in the range of "cols".
+            center = [3,6)
+        We will span the radius around the centeral cell.
+        From "center - radius" inclusive to "center + radius + 1" exclusive.
+            col_i = [c-r, c+r+1)
+        The board we want to hold the sums must have the shape of the ranges we sample.
+        So, the shape in this example must hold 3, 4, and 5.
+            cols[1] - cols[0] == 3
+        Hence,
+            sum_board.shape == (cols[1]-cols[0], )
+        We can only get and set our main game board within its range.
+            board.shape = (5, )
+        This will yield an error.
+            BOARD1[-1] = 1
+        And so will this.
+            BOARD1[5] = 1
+        Our game board is torus shaped. In theory, this is always true:
+            BOARD1[k * Nboard[0] + n] == BOARD1[n]
+        But we live in C, so we must torusify our indexes like so:
+            col_i_torus = col_i % Nboard[0] + Nboard[0]
+        When we check for equivalence, we use it like this:
+            BOARD1[col_i_torus] == foo
+        And add one whenever it's true
+            count++
+        For each col_center, there is one sum_board index that is:
+            sum_board_i = col_center - COLS1(0)
+        In our example, the three indexes will be:
+            3 - 3 == 0
+            4 - 3 == 1
+            5 - 3 == 2
+        So when we're out of the inner loop, we assign to the sum_board.
+            SUM_BOARD1(col_center - COLS1(0)) = count
+
+*/
 
 for (row_center = ROWS1(0); row_center < ROWS1(1); row_center++)
 {
-printf("row_center: %ld\n", row_center);
     for (col_center = COLS1(0); col_center < COLS1(1); col_center++)
     {
-    printf("col_center: %ld\n", col_center);
         count = 0;
-        for (row_i = row_center - radius; row_i < row_center + radius + 1; row_i++)
+        for (nh_row_i = row_center - radius; nh_row_i < row_center + radius + 1; nh_row_i++)
         {
-        printf("row_i: %ld\n", row_i);
-            for (col_i = col_center - radius; col_i < col_center + radius + 1; col_i++)
+            for (nh_col_i = col_center - radius; nh_col_i < col_center + radius + 1; nh_col_i++)
             {
-            printf("col_i: %ld\n", col_i);
-                row_torus = row_i % Nboard[0] + Nboard[0];
-                col_torus = col_i % Nboard[1] + Nboard[1];
-                printf("gene: %d; ", gene);
-                printf("board[%d, %d, %d]: %d; ", row_i_torus, col_i_torus, gene, BOARD3(row_i_torus, col_i_torus, gene));
-                printf("shape: (%d, %d); ", Nboard[0], Nboard[1]);
-                printf("count: %d; ", count);
+                // This is a funny thing. Python's modulus operation always yields a positive number,
+                //   both for a positive and a negative first argument.
+                //   C/C++'s modulus operation will yield a negative number for a negative first argument.
+                //   This is remedied by adding the second argument
+                nh_row_i_torus = (nh_row_i < 0) ?
+                                 nh_row_i % Nboard[0] + Nboard[0] :
+                                 nh_row_i % Nboard[0];
+                nh_col_i_torus = (nh_col_i < 0) ?
+                                 nh_col_i % Nboard[1] + Nboard[1] :
+                                 nh_col_i % Nboard[1];
+                printf("nh_row_i: %d, ", nh_row_i);
+                printf("nh_row_i_torus: %d, ", nh_row_i_torus);
+                printf("gene: %d, ", gene);
+                printf("board: %d, ", BOARD3(nh_row_i_torus, nh_col_i_torus, gene));
+                printf("allele: %d, ", allele);
                 printf("\n");
-
-
-                printf("count: %ld\n", count);
-                if ((BOARD3(row_i_torus, col_i_torus, gene)) == allele)
+                if (BOARD3(nh_row_i_torus, nh_col_i_torus, gene) == allele)
                 {
+                    printf("BOARD3(%d, %d, %d) == %d; allale == %d\n",
+                           nh_row_i_torus,
+                           nh_col_i_torus,
+                           gene,
+                           BOARD3(nh_row_i_torus, nh_col_i_torus, gene),
+                           allele);
                     count++;
                 }
-                printf("count: %ld\n", count);
             }
         }
-        printf("row_center - ROWS1(0): %ld\ncol_center - COLS1(0): %ld\n", row_center - ROWS1(0), col_center - COLS1(0));
-        SUM_BOARD2((row_center - ROWS1(0)) % Nboard[0] + Nboard[0],
-                   col_center % Nboard[1] + Nboard[1]) = count;
+        SUM_BOARD2(row_center - ROWS1(0), col_center - COLS1(0)) = count;
     }
 }
 '''
@@ -211,7 +260,8 @@ printf("row_center: %ld\n", row_center);
         print(sum_board.shape)
         sp.weave.inline(count_neighbors_code,
                         ['rows', 'cols', 'gene', 'allele', 'board', 'radius', 'sum_board'],
-                        {'rows': rows, 'cols': cols, 'gene': gene, 'allele': allele, 'board': self.board, 'sum_board': sum_board, 'radius': radius })
+                        {'rows': rows, 'cols': cols, 'gene': gene, 'allele': allele,
+                         'board': self.board, 'sum_board': sum_board, 'radius': radius })
         return sum_board
 
 #    @profile
@@ -250,24 +300,27 @@ printf("row_center: %ld\n", row_center);
 
         # rl, ch - row low, col high
 #        twosort = lambda x, y: (x, y) if x < y else (y, x)
-        rl, rh = (c_pos_1[0], c_pos_2[0]) if c_pos_1[0] < c_pos_2[0] else (c_pos_2[0], c_pos_1[0])
-        cl, ch = (c_pos_1[1], c_pos_2[1]) if c_pos_1[1] < c_pos_2[1] else (c_pos_2[1], c_pos_1[1])
+        rl, rh = (c_pos_1[0], c_pos_2[0]) if c_pos_1[0] < c_pos_2[0] else \
+                 (c_pos_2[0], c_pos_1[0])
+        cl, ch = (c_pos_1[1], c_pos_2[1]) if c_pos_1[1] < c_pos_2[1] else \
+                 (c_pos_2[1], c_pos_1[1])
+
+        # For signallers, we take both S_rad and C_rad around our competitors because
+        #   signallers affect CR[Ss] cells which, with their public goods, affect our competitors
+        s_rows = (rl - C_rad - S_rad, rh + C_rad + S_rad + 1)
+        c_rows = (rl - C_rad, rh + C_rad + 1)
+        s_cols = (cl - C_rad - S_rad, ch + C_rad + S_rad + 1)
+        c_cols = (cl - C_rad, ch + C_rad + 1)
+
 
         # I'll use this to keep the arrays as 2d (ndim=2)
         assert rl == rh or cl == ch, 'rl: {0}\nrh: {1}\ncl: {2}\n ch: {3}'.format(rl, rh, cl, ch)
         
-        if rl == rh:
+        if rl == rh:      # Competitors are on the same row
             shape = (1,2)
-        elif cl == ch:
+        else:             # otherwise, they're on the same column.
             shape = (2,1)
         
-        # For signallers, we take both S_rad and C_rad around our competitors because
-        # signallers affect CR[Ss] cells which, with their public goods, affect our competitors
-        s_row_range = sp.arange(rl - self.S_rad - self.C_rad, rh + self.S_rad + self.C_rad + 1) % self.board_size
-        s_col_range = sp.arange(cl - self.S_rad - self.C_rad, ch + self.S_rad + self.C_rad + 1) % self.board_size
-        rc_row_range = sp.arange(rl - self.C_rad, rh + self.C_rad + 1) % self.board_size
-        rc_col_range = sp.arange(cl - self.C_rad, ch + self.C_rad + 1) % self.board_size
-
         assert self.S_rad.dtype.kind == sp.int8(1).dtype.kind, 'Got {0}, wanted {1}'.format(self.S_rad.dtype.kind, sp.int_(1).dtype.kind)
         assert self.C_rad.dtype.kind == sp.int8(1).dtype.kind, 'Got {0}, wanted {1}'.format(self.C_rad.dtype.kind, sp.int_(1).dtype.kind)
         assert s_row_range.shape == (shape[0]-1 + 2 * self.S_rad + 2 * self.C_rad + 1, ), '''s_row_range: {0}
@@ -292,7 +345,22 @@ wanted: {3}'''.format(rc_col_range, cl, ch, (shape[1]-1 + 2 * self.C_rad + 1, ))
         assert C_sub.shape == tuple(sp.array(shape)+2), 'R_sub.shape: {0}\nshape: {1} and shape+2: {2}'.format(R_sub.shape, shape, sp.array(shape)+2)
 
         # we count how many signallers are within each cell's neighbourhood
-        S_conv = sp.signal.convolve2d(S_sub, self.S_kernel, mode='valid')
+        if shape == (2,1):
+            self.count_neighbors(self.horizontal_s_count,
+                                 p1[0]
+                                 rows,
+                                 cols,
+                                 gene = 0,
+                                 allele = 1,
+                                 radius = radius)
+        else:
+            self.count_neighbors(self.vertical_s_count,
+                                 rows,
+                                 cols,
+                                 gene = 0,
+                                 allele = 1,
+                                 radius = radius)
+        sp.signal.convolve2d(S_sub, self.S_kernel, mode='valid')
 
         assert_ndim(S_conv, 2)
 
@@ -622,7 +690,7 @@ for (int row_i = 0; row_i < 2; row_i++)
     {
         for (int gene_i = 0; gene_i < 3; gene_i++)
         {
-        printf("%d", BOARD((row_i+row0) % Nboard[0],
+        printf("%d", BOARD3((row_i+row0) % Nboard[0],
                             (col_i+col0) % Nboard[1],
                             gene_i));
         }
@@ -678,9 +746,9 @@ for (int row_i = 0; row_i < 2; row_i++)
     {
         for (int gene_i = 0; gene_i < 3; gene_i++)
         {
-            printf("%d", BOARD((row0 + row_i) % Nboard[0],
-                               col0 + col_i) % Nboard[1],
-                               gene_i));
+            printf("%d", BOARD3((row0 + row_i) % Nboard[0],
+                                (col0 + col_i) % Nboard[1],
+                                gene_i));
         }
         printf(" ");
     }

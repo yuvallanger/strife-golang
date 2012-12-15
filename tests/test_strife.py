@@ -50,8 +50,21 @@ class TestCountNV(unittest.TestCase):
                                      [1, 1, 0, 1],
                                      [0, 1, 1, 0],
                                      [1, 1, 1, 1]]], dtype='int64').transpose(1,2,0)
-        sum_board = a_game.count_neighbors(rows   = scipy.array([0, 2]),
-                                           cols   = scipy.array([0, 2]),
+        '''
+        with rows = [1,3), cols = [1,2)
+
+        at center = (1,1) and radius = 1
+        1 0 0
+        1 1 0 == 5
+        0 1 1
+
+        center = (2,1)
+        1 1 0
+        0 1 1 == 7
+        1 1 1
+        '''
+        sum_board = a_game.count_neighbors(rows   = scipy.array([1, 3]),
+                                           cols   = scipy.array([1, 2]),
                                            gene   = 0,
                                            allele = 1,
                                            radius = 1)
