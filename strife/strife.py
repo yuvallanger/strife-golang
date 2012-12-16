@@ -31,6 +31,9 @@ class Strife:
     """
 
     def __init__(self, config=None):
+        """
+        Creates a Game of Strife board. A dictionary argument called "config".
+        """
         if config is None:
             config = default_config
 
@@ -173,6 +176,30 @@ long count = 0;
 long nh_row_i_torus; // nh stands for neighborhood
 long nh_col_i_torus;
 long row_center, col_center;
+long rl, rh, cl, ch;
+
+
+if (C_POS_A1(0) < C_POS_B1(0))
+{
+    rl = C_POS_A1(0);
+    rh = C_POS_B1(0);
+}
+else
+{
+    rl = C_POS_B1(0);
+    rh = C_POS_A1(0);
+}
+
+if (C_POS_A1(0) < C_POS_B1(0))
+{
+    cl = C_POS_A1(1);
+    ch = C_POS_B1(1);
+}
+else
+{
+    cl = C_POS_B1(1);
+    ch = C_POS_A1(1);
+}
 
 /*
         board = array([0, 1, 2, 3, 4])
@@ -214,7 +241,6 @@ long row_center, col_center;
             SUM_BOARD1(col_center - COLS1(0)) = count
 
 */
-
 for (row_center = ROWS1(0); row_center < ROWS1(1); row_center++)
 {
     for (col_center = COLS1(0); col_center < COLS1(1); col_center++)
@@ -255,6 +281,48 @@ for (row_center = ROWS1(0); row_center < ROWS1(1); row_center++)
         SUM_BOARD2(row_center - ROWS1(0), col_center - COLS1(0)) = count;
     }
 }
+
+// We find public goods producing bacteria.
+for (row_center = ROWS1(0); row_center < ROWS1(1); row_center++)
+{
+    for (col_center = COLS1(0); col_center < COLS1(1); col_center++)
+    {
+        for (row_i = 0; row_i < 1 + C_rad + row_relation; row_i++)
+        {
+            for (col_i = 0; col_i < 1 + C_rad + col_relation; col_i)
+            {
+                // FIXME - The indexing is off
+                if ((!BOARD3(row_i, col_i, RECEPTOR) && BOARD3(row_i, col_i, COOPERATION)) ||
+                    (BOARD3(row_i, col_i, RECEPTOR) && SUM_BOARD2(row_i, col_i) && BOARD3(row_i, col_i, COOPERATION)))
+                {
+                    C_BOARD2(row_i, col_i) = 1;
+                }
+                else
+                {
+                    C_BOARD2(row_i, col_i) = 0;
+                }
+            }
+        }
+    }
+}
+
+// We'll count public goods and use it to see
+//   if there is a fitness benefit
+count = 0;
+for (row_center = 0; row_center < 
+for (row_i = 0; row_i < 1 + row_relation; row_i++)
+{
+    for (col_i = 0; col_i < 1 + col_relation; col_i++)
+    {
+        if (C_BOARD2)
+        {
+            count++;
+        }
+    }
+
+    count = 0;
+}
+        
 '''
         sum_board = scipy.empty((rows[1] - rows[0], cols[1] - cols[0]), dtype=sp.int64)
         print(sum_board.shape)
