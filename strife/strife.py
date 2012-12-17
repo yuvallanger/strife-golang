@@ -163,174 +163,6 @@ class Strife:
     ######
     ## functions
     ######
-    def count_neighbors(self, rows, cols, gene, allele, radius):
-        """
-        Counts all neighbors that have "allele" as their "gene" at a Moore's "radius" around each cell that lies between
-          rows[0] and rows[1] and between cols[0] and cols[1], inclusive.
-
-        Acts like scipy.signal.convolve2d with mode = 'valid', except that it only counts, does not convolves.
-        """
-        count_neighbors_code = r'''
-long nh_row_i, nh_col_i;
-long count = 0;
-long nh_row_i_torus; // nh stands for neighborhood
-long nh_col_i_torus;
-long row_center, col_center;
-long rl, rh, cl, ch;
-
-
-if (C_POS_A1(0) < C_POS_B1(0))
-{
-    rl = C_POS_A1(0);
-    rh = C_POS_B1(0);
-}
-else
-{
-    rl = C_POS_B1(0);
-    rh = C_POS_A1(0);
-}
-
-if (C_POS_A1(0) < C_POS_B1(0))
-{
-    cl = C_POS_A1(1);
-    ch = C_POS_B1(1);
-}
-else
-{
-    cl = C_POS_B1(1);
-    ch = C_POS_A1(1);
-}
-
-/*
-        board = array([0, 1, 2, 3, 4])
-        I want sums of 3, 4 and 5 so
-        The range of cells we want to have sums of neighbors is denoted in "cols".
-        Lower is inclusive. Higher is exclusive.
-            cols = [3 6)
-        The integers we span in the outer loop are exactly the ones in the range of "cols".
-            center = [3,6)
-        We will span the radius around the centeral cell.
-        From "center - radius" inclusive to "center + radius + 1" exclusive.
-            col_i = [c-r, c+r+1)
-        The board we want to hold the sums must have the shape of the ranges we sample.
-        So, the shape in this example must hold 3, 4, and 5.
-            cols[1] - cols[0] == 3
-        Hence,
-            sum_board.shape == (cols[1]-cols[0], )
-        We can only get and set our main game board within its range.
-            board.shape = (5, )
-        This will yield an error.
-            BOARD1[-1] = 1
-        And so will this.
-            BOARD1[5] = 1
-        Our game board is torus shaped. In theory, this is always true:
-            BOARD1[k * Nboard[0] + n] == BOARD1[n]
-        But we live in C, so we must torusify our indexes like so:
-            col_i_torus = col_i % Nboard[0] + Nboard[0]
-        When we check for equivalence, we use it like this:
-            BOARD1[col_i_torus] == foo
-        And add one whenever it's true
-            count++
-        For each col_center, there is one sum_board index that is:
-            sum_board_i = col_center - COLS1(0)
-        In our example, the three indexes will be:
-            3 - 3 == 0
-            4 - 3 == 1
-            5 - 3 == 2
-        So when we're out of the inner loop, we assign to the sum_board.
-            SUM_BOARD1(col_center - COLS1(0)) = count
-
-*/
-for (row_center = ROWS1(0); row_center < ROWS1(1); row_center++)
-{
-    for (col_center = COLS1(0); col_center < COLS1(1); col_center++)
-    {
-        count = 0;
-        for (nh_row_i = row_center - radius; nh_row_i < row_center + radius + 1; nh_row_i++)
-        {
-            for (nh_col_i = col_center - radius; nh_col_i < col_center + radius + 1; nh_col_i++)
-            {
-                // This is a funny thing. Python's modulus operation always yields a positive number,
-                //   both for a positive and a negative first argument.
-                //   C/C++'s modulus operation will yield a negative number for a negative first argument.
-                //   This is remedied by adding the second argument
-                nh_row_i_torus = (nh_row_i < 0) ?
-                                 nh_row_i % Nboard[0] + Nboard[0] :
-                                 nh_row_i % Nboard[0];
-                nh_col_i_torus = (nh_col_i < 0) ?
-                                 nh_col_i % Nboard[1] + Nboard[1] :
-                                 nh_col_i % Nboard[1];
-                printf("nh_row_i: %d, ", nh_row_i);
-                printf("nh_row_i_torus: %d, ", nh_row_i_torus);
-                printf("gene: %d, ", gene);
-                printf("board: %d, ", BOARD3(nh_row_i_torus, nh_col_i_torus, gene));
-                printf("allele: %d, ", allele);
-                printf("\n");
-                if (BOARD3(nh_row_i_torus, nh_col_i_torus, gene) == allele)
-                {
-                    printf("BOARD3(%d, %d, %d) == %d; allale == %d\n",
-                           nh_row_i_torus,
-                           nh_col_i_torus,
-                           gene,
-                           BOARD3(nh_row_i_torus, nh_col_i_torus, gene),
-                           allele);
-                    count++;
-                }
-            }
-        }
-        SUM_BOARD2(row_center - ROWS1(0), col_center - COLS1(0)) = count;
-    }
-}
-
-// We find public goods producing bacteria.
-for (row_center = ROWS1(0); row_center < ROWS1(1); row_center++)
-{
-    for (col_center = COLS1(0); col_center < COLS1(1); col_center++)
-    {
-        for (row_i = 0; row_i < 1 + C_rad + row_relation; row_i++)
-        {
-            for (col_i = 0; col_i < 1 + C_rad + col_relation; col_i)
-            {
-                // FIXME - The indexing is off
-                if ((!BOARD3(row_i, col_i, RECEPTOR) && BOARD3(row_i, col_i, COOPERATION)) ||
-                    (BOARD3(row_i, col_i, RECEPTOR) && SUM_BOARD2(row_i, col_i) && BOARD3(row_i, col_i, COOPERATION)))
-                {
-                    C_BOARD2(row_i, col_i) = 1;
-                }
-                else
-                {
-                    C_BOARD2(row_i, col_i) = 0;
-                }
-            }
-        }
-    }
-}
-
-// We'll count public goods and use it to see
-//   if there is a fitness benefit
-count = 0;
-for (row_center = 0; row_center < 
-for (row_i = 0; row_i < 1 + row_relation; row_i++)
-{
-    for (col_i = 0; col_i < 1 + col_relation; col_i++)
-    {
-        if (C_BOARD2)
-        {
-            count++;
-        }
-    }
-
-    count = 0;
-}
-        
-'''
-        sum_board = scipy.empty((rows[1] - rows[0], cols[1] - cols[0]), dtype=sp.int64)
-        print(sum_board.shape)
-        sp.weave.inline(count_neighbors_code,
-                        ['rows', 'cols', 'gene', 'allele', 'board', 'radius', 'sum_board'],
-                        {'rows': rows, 'cols': cols, 'gene': gene, 'allele': allele,
-                         'board': self.board, 'sum_board': sum_board, 'radius': radius})
-        return sum_board
 
 #    @profile
     def competition(self, c_pos_1, c_pos_2, p_pair):
@@ -379,6 +211,14 @@ but are actually of {p1dtype} and {p2dtype}.'.format(p1, p2, p1.dtype, p2.dtype)
                  (c_pos_2[0], c_pos_1[0])
         cl, ch = (c_pos_1[1], c_pos_2[1]) if c_pos_1[1] < c_pos_2[1] else \
                  (c_pos_2[1], c_pos_1[1])
+
+        support_code = open('support_code.c').read().format({'S_rad': self.S_rad,
+                                                             'C_rad': self.C_rad,
+                                                             'Nboard_row': board.shape[0],
+                                                             'Nboard_col': board.shape[1],
+                                                             'RECEPTOR': 0,                                                             'SIGNAL': 1
+                                                             'SIGNAL': 1,
+                                                             'COOPERATION': 2}
 
         # For signallers, we take both S_rad and C_rad around our competitors because
         #   signallers affect CR[Ss] cells which, with their public goods, affect our competitors
