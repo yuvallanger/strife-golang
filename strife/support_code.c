@@ -79,3 +79,10 @@ long c_count(long row_center, long col_center)
 
     return count;
 }
+
+long metabolism(long row, long col)
+{
+    return c_count(row, col) * (1 - {benefit}) * ({R_cost} * BOARD3(row, col, RECEPTOR) +
+                                                  {S_cost} * BOARD3(row, col, SIGNAL) +
+                                                  {C_cost} * BOARD3(row, col, COOPERATION));
+}

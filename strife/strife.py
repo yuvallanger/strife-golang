@@ -9,6 +9,7 @@ http://www.plosone.org/article/info:doi/10.1371/journal.pone.0006655
 import h5py
 #import os
 import time
+import numpy as np
 import scipy as sp
 import scipy.signal
 import scipy.weave
@@ -47,10 +48,10 @@ class Strife:
 
         #######
         # Cost of gene expression
-        self.S_cost = sp.int64(config['S_cost'])
-        self.R_cost = sp.int64(config['R_cost'])
-        self.C_cost = sp.int64(config['C_cost'])
-        self.metabolic_baseline = sp.int64(config['metabolic_baseline'])  # B for Baseline, basal, "basic metabolic burden"
+        self.S_cost = sp.float64(config['S_cost'])
+        self.R_cost = sp.float64(config['R_cost'])
+        self.C_cost = sp.float64(config['C_cost'])
+        self.metabolic_baseline = sp.float64(config['metabolic_baseline'])  # B for Baseline, basal, "basic metabolic burden"
 
         #####
         # benefit from cooperation. "reward factor" in the article.
@@ -76,16 +77,16 @@ class Strife:
         self.S_rad = sp.int64(config['S_rad'])
         self.C_rad = sp.int64(config['C_rad'])
 
-        #######
-        # We don't want to create these again and again while counting for each competition.
-        self.horizontal_s_count = sp.empty(2 + 2 * self.S_rad + 2 * self.C_rad,
-                                           1 + 2 * self.S_rad + 2 * self.C_rad)
-        self.vertical_s_count = sp.empty(2 + 2 * self.S_rad + 2 * self.C_rad,
-                                         1 + 2 * self.S_rad + 2 * self.C_rad)
-        self.horizontal_c_count = sp.empty(2 + 2 * self.C_rad,
-                                           1 + 2 * self.C_rad)
-        self.vertical_c_count = sp.empty(2 + 2 * self.C_rad,
-                                         1 + 2 * self.C_rad)
+#        #######
+#        # We don't want to create these again and again while counting for each competition.
+#        self.horizontal_s_count = sp.empty(2 + 2 * self.S_rad + 2 * self.C_rad,
+#                                           1 + 2 * self.S_rad + 2 * self.C_rad)
+#        self.vertical_s_count = sp.empty(2 + 2 * self.S_rad + 2 * self.C_rad,
+#                                         1 + 2 * self.S_rad + 2 * self.C_rad)
+#        self.horizontal_c_count = sp.empty(2 + 2 * self.C_rad,
+#                                           1 + 2 * self.C_rad)
+#        self.vertical_c_count = sp.empty(2 + 2 * self.C_rad,
+#                                         1 + 2 * self.C_rad)
 
         self.generations = sp.int64(config['generations'])
 
@@ -108,15 +109,6 @@ class Strife:
         self.step_count = sp.int64(0)
 
         self.steps_final = sp.int64(self.generations * self.board_size ** 2)
-
-        # diameter of the convolution matrix
-        diameter = lambda x: sp.int64(2 * x + 1)
-        S_len = diameter(self.S_rad)
-        C_len = diameter(self.C_rad)
-
-        # the convolution matrix used to count neighbours
-        self.S_kernel = sp.ones((S_len, S_len))
-        self.C_kernel = sp.ones((C_len, C_len))
 
         # A cell can be Signalling and/or Receptive and/or Cooperative
         R = sp.rand(self.board_size, self.board_size) < config['initial_receptives_amount']
@@ -146,6 +138,33 @@ class Strife:
         self.samples_frequency = sp.empty((self.samples_num, self.genotype_num), dtype='int64')
         self.samples_nhood = sp.empty((self.samples_num, self.genotype_num, self.genotype_num), dtype=sp.int64)
         self.samples_board = sp.empty((self.samples_board_num, self.board_size, self.board_size, 3), dtype=sp.int64)
+
+        support_code = open('support_code.c').read().format({'S_rad': self.S_rad,
+                                                             'C_rad': self.C_rad,
+                                                             'Nboard_row': board.shape[0],
+                                                             'Nboard_col': board.shape[1],
+                                                             'RECEPTOR': 0,
+                                                             'SIGNAL': 1,
+                                                             'COOPERATION': 2,
+                                                             'R_cost': self.R_cost,
+                                                             'S_cost': self.S_cost,
+                                                             'C_cost': self.C_cost})
+
+        code = '''
+long C_th = {C_th};
+long benefit = {benefit};
+long metabolism_1 = (c_count(C_POS1(0), C_POS1(1)) >= C_th) * (1 - (benefit);
+long metabolism_2 = ();
+if ((metabolism(C_POS_11[0], C_POS_11[1]) * p1) >
+    (metabolism(C_POS_11[0], C_POS_11[1]) * p1))
+    // The number at the end of the "C_POS" denotes number dimensions in the nd-array (ndim).
+{
+    return 1;
+}
+else
+{
+    return 2;
+}'''
 
     def __init_unpack_parameters__(self, d):
 
@@ -198,187 +217,28 @@ but are actually of {p1dtype} and {p2dtype}.'.format(p1, p2, p1.dtype, p2.dtype)
                (c_pos_2t[0] < self.board_size) and \
                (c_pos_2t[1] < self.board_size), 'c_pos_1: {0}\nc_pos_2t: {1}'.format(c_pos_1, c_pos_2t)
 
-        # two identical cells competing will result in two identical cells,
-        # so we will return now with no further calculation of this competition.
-        if (self.board[c_pos_1[0], c_pos_1[1]] == self.board[c_pos_2t[0], c_pos_2t[1]]).all():
-            return (c_pos_2t, c_pos_1)
+        winner = scipy.weave.inline(code, ['board',
+                                           'row',
+                                           'col',
+                                           'c_pos_1',
+                                           'c_pos_2',
+                                           'B_cost',
+                                           'R_cost',
+                                           'S_cost',
+                                           'C_cost'],
+                                    {'board': self.board,
+                                     'row': row,
+                                     'col': col,
+                                     'c_pos_1': c_pos_1,
+                                     'c_pos_2': c_pos_2,
+                                     'B_cost': self.B_cost,
+                                     'R_cost': self.R_cost,
+                                     'S_cost': self.S_cost,
+                                     'C_cost': self.C_cost},
+                                    support_code=support_code)
 
-        ## We will optimize by taking a sub array from each genotype array around the competitors.
-
-        # rl, ch - row low, col high
-#        twosort = lambda x, y: (x, y) if x < y else (y, x)
-        rl, rh = (c_pos_1[0], c_pos_2[0]) if c_pos_1[0] < c_pos_2[0] else \
-                 (c_pos_2[0], c_pos_1[0])
-        cl, ch = (c_pos_1[1], c_pos_2[1]) if c_pos_1[1] < c_pos_2[1] else \
-                 (c_pos_2[1], c_pos_1[1])
-
-        support_code = open('support_code.c').read().format({'S_rad': self.S_rad,
-                                                             'C_rad': self.C_rad,
-                                                             'Nboard_row': board.shape[0],
-                                                             'Nboard_col': board.shape[1],
-                                                             'RECEPTOR': 0,                                                             'SIGNAL': 1
-                                                             'SIGNAL': 1,
-                                                             'COOPERATION': 2}
-
-        # For signallers, we take both S_rad and C_rad around our competitors because
-        #   signallers affect CR[Ss] cells which, with their public goods, affect our competitors
-        s_rows = (rl - self.C_rad - self.S_rad, rh + self.C_rad + self.S_rad + 1)
-        s_cols = (cl - self.C_rad - self.S_rad, ch + self.C_rad + self.S_rad + 1)
-        c_rows = (rl - self.C_rad, rh + self.C_rad + 1)
-        c_cols = (cl - self.C_rad, ch + self.C_rad + 1)
-
-        # I'll use this to keep the arrays as 2d (ndim=2)
-        assert rl == rh or cl == ch, 'rl: {0}\nrh: {1}\ncl: {2}\n ch: {3}'.format(rl, rh, cl, ch)
-
-        if rl == rh:      # Competitors are on the same row
-            shape = (1, 2)
-            s_count = self.horizontal_s_count
-            c_count = self.horizontal_c_count
-        else:             # otherwise, they're on the same column.
-            shape = (2, 1)
-            s_count = self.vertical_s_count
-            c_count = self.vertical_c_count
-
-        assert self.S_rad.dtype.kind == sp.int8(1).dtype.kind, 'Got {0}, wanted {1}'.format(self.S_rad.dtype.kind, sp.int_(1).dtype.kind)
-        assert self.C_rad.dtype.kind == sp.int8(1).dtype.kind, 'Got {0}, wanted {1}'.format(self.C_rad.dtype.kind, sp.int_(1).dtype.kind)
-        assert s_row_range.shape == (shape[0] - 1 + 2 * self.S_rad + 2 * self.C_rad + 1, ), '''s_row_range: {0}
-rl: {1}; rh: {2}
-wanted: {3}'''.format(s_row_range, rl, rh, (shape[0] - 1 + 2 * self.S_rad + 2 * self.C_rad + 1, ))
-        assert s_col_range.shape == (shape[1] - 1 + 2 * self.S_rad + 2 * self.C_rad + 1, ), '''s_col_range: {0}
-cl: {1}; ch: {2}
-wanted: {3}'''.format(s_col_range, cl, ch, (shape[1] - 1 + 2 * self.S_rad + 2 * self.C_rad + 1, ))
-        assert rc_row_range.shape == (shape[0] - 1 + 2 * self.C_rad + 1, ), '''rc_row_range: {0}
-rl: {1}; rh: {2}
-wanted: {3}'''.format(rc_row_range, rl, rh, (shape[0] - 1 + 2 * self.C_rad + 1, ))
-        assert rc_col_range.shape == (shape[1] - 1 + 2 * self.C_rad + 1, ), '''rc_col_range: {0}
-cl: {1}; ch: {2}
-wanted: {3}'''.format(rc_col_range, cl, ch, (shape[1] - 1 + 2 * self.C_rad + 1, ))
-
-        R_sub = self.board[rc_row_range, :, 0][:, rc_col_range]
-        S_sub = self.board[s_row_range, :, 1][:, s_col_range]
-        C_sub = self.board[rc_row_range, :, 2][:, rc_col_range]
-
-        assert R_sub.shape == tuple(sp.array(shape)+2), 'R_sub.shape: {0}\nshape: {1} and shape+2: {2}'.format(R_sub.shape, shape, sp.array(shape)+2)
-        assert S_sub.shape == tuple(sp.array(shape)+4), 'R_sub.shape: {0}\nshape: {1} and shape+2: {2}'.format(R_sub.shape, shape, sp.array(shape)+4)
-        assert C_sub.shape == tuple(sp.array(shape)+2), 'R_sub.shape: {0}\nshape: {1} and shape+2: {2}'.format(R_sub.shape, shape, sp.array(shape)+2)
-
-        # we count how many signallers are within each cell's neighbourhood
-        self.count_neighbors(s_count,
-                             p1[0],
-                             s_rows,
-                             s_cols,
-                             gene=0,
-                             allele=1,
-                             radius=self.S_rad)
-
-        # a cell will produce common goods if it's receptive and cooperative and signal in its neighborhood is above threshold
-        # or when it's unreceptive and cooperative, with no regard to signal in its neighbourhood.
-        cooping_cells = ((C_sub & R_sub) & (s_count >= self.S_th)) | (C_sub & (R_sub ^ True))
-
-        assert_ndim(cooping_cells, 2)
-        assert (cooping_cells.shape == (3, 4) and shape == (1, 2)) or \
-               (cooping_cells.shape == (4, 3) and shape == (2, 1)), \
-            '''cooping_cells.shape: {0} shape: {1}'''.format(cooping_cells.shape, shape)
-
-        # ATTENTION: only works with C_len == 3, C_kernel.shape == (3, 3).
-        if cooping_cells.shape == (4, 3):
-            cooping_competitors = cooping_cells[1:3, 1].reshape(shape)
-        elif cooping_cells.shape == (3, 4):
-            cooping_competitors = cooping_cells[1, 1:3].reshape(shape)
-        else:
-            raise 'blah'
-
-        assert cooping_competitors.shape == shape, 'cooping_competitors: {0}\nshape: {1}\nWanted shape: (1,2) or (2,1)'.format(cooping_competitors.shape, shape)
-
-        # how many cooperators around each competitor?
-        C_conv = sp.signal.convolve2d(cooping_cells, self.C_kernel, mode='valid')
-        assert C_conv.shape == shape, '''C_conv.shape: {0}
-shape: {1}'''.format(C_conv.shape, shape)
-
-        # Public goods effect.
-        # G for Goods.
-        # Which are the cells that enjoy the effect of public goods?
-        G = (C_conv >= self.C_th)
-
-        assert G.shape == shape, 'G.shape: {0}\nshape: {1}'.format(G.shape, shape)
-
-        # all cells for which the effect of goods is above threshold is True in G.
-        # M for Metabolism
-        twocellpos_r = sp.arange(rl, rh + 1) % self.board_size
-        twocellpos_c = sp.arange(cl, ch + 1) % self.board_size
-
-        assert (twocellpos_r.shape == (2,) and twocellpos_c.shape == (1,)) or (twocellpos_r.shape == (1,) and twocellpos_c.shape == (2,)), 'twocellpos_r.shape: {0}\ntwocellpos_c.shape: {1}\nshape: {2}'.format(twocellpos_r.shape, twocellpos_c.shape, shape)
-
-        R_cost_board = self.R_cost * self.board[twocellpos_r, twocellpos_c, 0].reshape(shape)
-        S_cost_board = self.S_cost * self.board[twocellpos_r, twocellpos_c, 1].reshape(shape)
-        C_cost_board = self.C_cost * cooping_competitors
-
-        assert R_cost_board.shape == shape, 'R_cost_board: {0}\nWanted ndim: 1'.format(R_cost_board)
-        assert S_cost_board.shape == shape, 'S_cost_board: {0}\nWanted ndim: 1'.format(S_cost_board)
-        assert C_cost_board.shape == shape, 'C_cost_board: {0}\nWanted ndim: 1'.format(C_cost_board)
-
-        Total_cost_board = S_cost_board + R_cost_board + C_cost_board + self.metabolic_baseline
-
-        assert_ndim(Total_cost_board, 2)
-
-        M = G * (1 - self.benefit) * Total_cost_board
-        assert_ndim(M, 2)
-        # all false in G don't benefit from public goods (G^True flips values)
-        M += (G ^ True) * Total_cost_board
-        assert_ndim(M, 2)
-        M = self.metabolic_baseline / M
-        assert_ndim(M, 2)
-        score1 = p1 * M.item(0)  # score1 is the first position's score
-        score2 = p2 * M.item(1)  # score2 is the second position's score
-        if shape == (2, 1):
-            assert M.shape == (2, 1), 'M.shape == {0}\nWanted == {1}'.format(M.shape, (2, 1))
-            if c_pos_2[0] > c_pos_1[0]:
-                # their position is like this:
-                # 2
-                # 1
-                if score1 > score2:
-                    #print("comp 2 wins")
-                    # competitor 2 wins
-                    return (c_pos_2t, c_pos_1)
-                else:
-                    #print("comp 1 wins")
-                    # competitor 1 wins
-                    return (c_pos_1, c_pos_2t)
-            else:
-                # their position is like this:
-                # 1
-                # 2
-                if score1 > score2:
-                    #print("comp 1 wins")
-                    # competitor 1 wins
-                    return (c_pos_1, c_pos_2t)
-                else:
-                    #print("comp 2 wins")
-                    # competitor 2 wins
-                    return (c_pos_2t, c_pos_1)
-        else:
-            assert M.shape == (1, 2), 'M.shape == {0}\nWanted == {1}'.format(M.shape, (1, 2))
-            if c_pos_2[1] < c_pos_1[1]:
-                # their position is like this:
-                # 2 1
-                if score1 > score2:
-                    #print("comp 2 wins")
-                    # competitor 2 wins
-                    return (c_pos_2t, c_pos_1)
-                else:
-                    # competitor 1 wins
-                    return (c_pos_1, c_pos_2t)
-            else:
-                # their position is like this:
-                # 1 2
-                if score1 > score2:
-                    #print("comp 1 wins")
-                    # competitor 1 wins
-                    return (c_pos_1, c_pos_2t)
-                else:
-                    #print("comp 2 wins")
-                    # competitor 2 wins
-                    return (c_pos_2t, c_pos_1)
+        return (c_pos_1, c_pos_2) if (winner == 1) else
+               (c_pos_2, c_pos_1)
 
     def copycell(self, orig, dest):
         """
@@ -408,12 +268,13 @@ shape: {1}'''.format(C_conv.shape, shape)
         Saves the attributes of self whose names show up as keys in self.parameters.
         """
         with h5py.File(self.data_filename) as ff:
-            for key in self.parameters:
-                try:
-                    print(key, type(getattr(self, key)))
-                    ff[key] = getattr(self, key)
-                except:
-                    ff[key][...] = getattr(self, key)
+            for key, val in vars(self).items():
+                if type(val).__module__ == np.__name__:
+                    try:
+                        print(key, type(getattr(self, key)))
+                        ff[key] = getattr(self, key)
+                    except:
+                        ff[key][...] = getattr(self, key)
 
     def load_h5(self):
         with h5py.File(self.data_filename) as ff:
