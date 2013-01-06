@@ -33,6 +33,42 @@ class Strife:
 
     When initiated with no config dictionary, default_config is loaded.
     """
+    saved_attributes = ['fname',
+                        'S_cost',
+                        'R_cost',
+                        'C_cost',
+                        'metabolic_baseline',
+                        'benefit',
+                        'mutation_rate_r',
+                        'mutation_rate_s',
+                        'mutation_rate_c',
+                        'S_th',
+                        'C_th',
+                        'diffusion_amount',
+                        'S_rad',
+                        'C_rad',
+                        'generations',
+                        'board_size',
+                        'NEIGHBOUR_REL_POS',
+                        'step_count',
+                        'steps_final',
+                        'S_len',
+                        'C_len',
+                        'S_kernel',
+                        'C_kernel',
+                        'board',
+                        'genotype_num',
+                        'steps_per_gen',
+                        'samples_per_gen',
+                        'samples_num',
+                        'samples_board_num',
+                        'steps_per_sample',
+                        'steps_per_board_sample',
+                        'sample_count',
+                        'samples_frequency',
+                        'samples_nhood',
+                        'samples_board']
+
     def __init__(self, config=None):
         if config == None:
             config = default_config
@@ -41,7 +77,7 @@ class Strife:
 
         ########
         # filname
-        d['fname'] = config['data_filename']
+        self.fname = config['data_filename']
 
         #########
         # model parameters
@@ -49,45 +85,45 @@ class Strife:
         
         #######
         # Cost of gene expression
-        d['S_cost'] = sp.int64(config['S_cost'])
-        d['R_cost'] = sp.int64(config['R_cost'])
-        d['C_cost'] = sp.int64(config['C_cost'])
-        d['metabolic_baseline'] = sp.int64(config['metabolic_baseline'])  # B for Baseline, basal, "basic metabolic burden"
+        self.S_cost = sp.int64(config['S_cost'])
+        self.R_cost = sp.int64(config['R_cost'])
+        self.C_cost = sp.int64(config['C_cost'])
+        self.metabolic_baseline = sp.int64(config['metabolic_baseline'])  # B for Baseline, basal, "basic metabolic burden"
 
         #####
         # benefit from cooperation. "reward factor" in the article.
-        d['benefit'] = sp.float64(config['benefit'])
+        self.benefit = sp.float64(config['benefit'])
 
         ######
         # mutation per generation
-        d['mutation_rate_r'] = sp.float64(config['mutation_rate_r'])
-        d['mutation_rate_s'] = sp.float64(config['mutation_rate_s'])
-        d['mutation_rate_c'] = sp.float64(config['mutation_rate_c'])
+        self.mutation_rate_r = sp.float64(config['mutation_rate_r'])
+        self.mutation_rate_s = sp.float64(config['mutation_rate_s'])
+        self.mutation_rate_c = sp.float64(config['mutation_rate_c'])
 
         ## neighbours effects' thresholds
-        d['S_th'] = sp.int64(config['S_th'])
+        self.S_th = sp.int64(config['S_th'])
         # quorum threshold
-        d['C_th'] = sp.int64(config['C_th'])
+        self.C_th = sp.int64(config['C_th'])
         # Cooperation threshold. Above it, public goods makes a difference.
         
         ## Probability of each single diffusion operation
-        d['diffusion_amount'] = sp.float64(config['diffusion_amount'])
+        self.diffusion_amount = sp.float64(config['diffusion_amount'])
         
         #######
         # radius of Signal or Cooperation effects.
-        d['S_rad'] = sp.int64(config['S_rad'])
-        d['C_rad'] = sp.int64(config['C_rad'])
+        self.S_rad = sp.int64(config['S_rad'])
+        self.C_rad = sp.int64(config['C_rad'])
        
-        d['generations'] = sp.int64(config['generations'])
+        self.generations = sp.int64(config['generations'])
 
-        d['board_size'] = sp.int64(config['board_size'])
+        self.board_size = sp.int64(config['board_size'])
       
         #####
         # settings
         #####
         
         cdef long[:,:] NEIGHBOUR_REL_POS = sp.array([(0, -1), (0, 1), (-1, 0), (1, 0)])
-        d['NEIGHBOUR_REL_POS'] = NEIGHBOUR_REL_POS
+        self.NEIGHBOUR_REL_POS = NEIGHBOUR_REL_POS
 
         ## time keeping
         # number of generations the simulation will run
@@ -97,42 +133,42 @@ class Strife:
 
         #######
         # we'll increase step_count by one every time two cells compete.
-        d['step_count'] = sp.int64(0)
+        self.step_count = sp.int64(0)
 
 
-        d['steps_final'] = sp.int64(d['generations'] * d['board_size']**2)
+        self.steps_final = sp.int64(self.generations * self.board_size**2)
 
         # diameter of the convolution matrix
         diameter = lambda x: sp.int64(2 * x + 1)
-        S_len = diameter(d['S_rad'])
-        C_len = diameter(d['C_rad'])
+        S_len = diameter(self.S_rad)
+        C_len = diameter(self.C_rad)
 
         # the convolution matrix used to count neighbours
-        d['S_kernel'] = sp.ones((S_len, S_len))
-        d['C_kernel'] = sp.ones((C_len, C_len))
+        self.S_kernel = sp.ones((S_len, S_len))
+        self.C_kernel = sp.ones((C_len, C_len))
 
         # A cell can be Signalling and/or Receptive and/or Cooperative
-        R = sp.rand(d['board_size'], d['board_size']) < config['initial_receptives_amount']
-        S = sp.rand(d['board_size'], d['board_size']) < config['initial_signallers_amount']
-        C = sp.rand(d['board_size'], d['board_size']) < config['initial_cooperators_amount']
-        d['board'] = sp.array([R, S, C]).transpose((1,2,0))
-        assert d['board_size'] == d['board'].shape[0] and d['board_size'] == d['board'].shape[1], 'B.shape: {0}\nN: {1}\nWanted: {2}'.format(d['board'].shape, d['board_size'], (d['board_size'], d['board_size'], 3))
+        R = sp.rand(self.board_size, self.board_size) < config['initial_receptives_amount']
+        S = sp.rand(self.board_size, self.board_size) < config['initial_signallers_amount']
+        C = sp.rand(self.board_size, self.board_size) < config['initial_cooperators_amount']
+        self.board = sp.array([R, S, C]).transpose((1,2,0))
+        assert self.board_size == self.board.shape[0] and self.board_size == self.board.shape[1], 'B.shape: {0}\nN: {1}\nWanted: {2}'.format(self.board.shape, self.board_size, (self.board_size, self.board_size, 3))
         
-        d['genotype_num'] = sp.int64(8)
+        self.genotype_num = sp.int64(8)
         
         ## data sampling
         # we will take a frequency sample some number of times per generation
-        d['steps_per_gen'] = sp.int64(d['board_size'] ** 2)
-        d['samples_per_gen'] = sp.int64(1)
-        d['samples_num'] = sp.int64(d['samples_per_gen'] * d['generations'])
-        d['samples_board_num'] = sp.int64(d['samples_num'] // 10)
-        d['steps_per_sample'] = sp.int64(sp.floor(1.0 * d['steps_per_gen'] // d['samples_per_gen']), dtype=sp.int64)
-        d['steps_per_board_sample'] = sp.int64(10 * d['steps_per_sample'])
-        d['sample_count'] = sp.int64(0)
+        self.steps_per_gen = sp.int64(self.board_size ** 2)
+        self.samples_per_gen = sp.int64(1)
+        self.samples_num = sp.int64(self.samples_per_gen * self.generations)
+        self.samples_board_num = sp.int64(self.samples_num // 10)
+        self.steps_per_sample = sp.int64(sp.floor(1.0 * self.steps_per_gen // self.samples_per_gen), dtype=sp.int64)
+        self.steps_per_board_sample = sp.int64(10 * self.steps_per_sample)
+        self.sample_count = sp.int64(0)
         # We want to know the frequency of each genotype per generation
-        d['samples_frequency'] = sp.empty((d['samples_num'], d['genotype_num']), dtype='int32')
-        d['samples_nhood'] = sp.empty((d['samples_num'], d['genotype_num'], d['genotype_num']), dtype=sp.int64)
-        d['samples_board'] = sp.empty((d['samples_board_num'], d['board_size'], d['board_size'], 3), dtype=sp.int64)
+        self.samples_frequency = sp.empty((self.samples_num, self.genotype_num), dtype='int32')
+        self.samples_nhood = sp.empty((self.samples_num, self.genotype_num, self.genotype_num), dtype=sp.int64)
+        self.samples_board = sp.empty((self.samples_board_num, self.board_size, self.board_size, 3), dtype=sp.int64)
        
         if not config == None:
             self.__init_unpack_parameters__(d)
