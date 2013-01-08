@@ -1,3 +1,4 @@
+import pyximport; pyximport.install()
 import unittest
 import strife.strife.strife
 import scipy
