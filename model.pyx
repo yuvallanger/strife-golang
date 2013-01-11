@@ -557,8 +557,9 @@ cpdef rotquad90(int[:,:,:] board, int direction, int[:] position):
     row0, col0 = ( position[0],
                    position[1] )
 
-    cdef int row1, col1 = ( (row0 + 1) % board.shape[0],
-                            (col0 + 1) % board.shape[1] )
+    cdef int row1, col1
+    row1, col1 = ( (row0 + 1) % board.shape[0],
+                   (col0 + 1) % board.shape[1] )
 
     if direction == 0:
         for gene_i in range(3):
