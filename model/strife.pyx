@@ -6,7 +6,7 @@ A model by Dr. Avigdor Eldar based on Czárán's work.
 http://www.plosone.org/article/info:doi/10.1371/journal.pone.0006655
 """
 
-#import h5py
+import strife.h5py
 import os
 import time
 import scipy as sp
@@ -58,7 +58,7 @@ cdef class Strife:
 
     When initiated with no config dictionary, default_config is loaded.
     """
-    saved_attributes = {'fname',
+    saved_attributes = {'data_filename',
                         'S_cost',
                         'R_cost',
                         'C_cost',
@@ -102,7 +102,7 @@ cdef class Strife:
 
         ########
         # filname
-        self.fname = config['data_filename']
+        self.data_filename = config['data_filename']
 
         #########
         # model parameters
@@ -230,14 +230,15 @@ cdef class Strife:
 
         # c_pos_2's coordinates in a torus:
         c_pos_2t = c_pos_2 % self.board_size
-        assert (0 <= c_pos_1[0]) and \
-               (0 <= c_pos_1[1]) and \
-               (0 <= c_pos_2t[0]) and \
-               (0 <= c_pos_2t[1]) and \
-               (c_pos_1[0] < self.board_size) and \
-               (c_pos_1[1] < self.board_size) and \
-               (c_pos_2t[0] < self.board_size) and \
-               (c_pos_2t[1] < self.board_size), 'c_pos_1: {0}\nc_pos_2t: {1}'.format(c_pos_1, c_pos_2t)
+        assert ( ( (0 <= c_pos_1[0]) and
+                   (0 <= c_pos_1[1]) and
+                   (0 <= c_pos_2t[0]) and
+                   (0 <= c_pos_2t[1]) and
+                   (c_pos_1[0] < self.board_size) and
+                   (c_pos_1[1] < self.board_size) and
+                   (c_pos_2t[0] < self.board_size) and
+                   (c_pos_2t[1] < self.board_size) ),
+                'c_pos_1: {0}\nc_pos_2t: {1}'.format(c_pos_1, c_pos_2t) )
 
         # two identical cells competing will result in two identical cells,
         # so we will return now with no further calculation of this competition.
@@ -425,22 +426,16 @@ shape: {1}'''.format(C_conv.shape, shape)
         if sp.rand() < self.mutation_rate_c:
             self.board[pos[0], pos[1], 2] = self.board[pos[0], pos[1], 2] ^ True
 
-#    def save_h5(self):
-#        """
-#        Saves the attributes of self whose names show up as keys in self.parameters.
-#        """
-#        with h5py.File(self.fname) as ff:
-#            for key in self.saved_attributes:
-#                try:
-#                    print key, type(getattr(self, key))
-#                    ff[key] = getattr(self, key)
-#                except:
-#                    ff[key][...] = getattr(self, key)
-#    
-#    def load_h5(self):
-#        with h5py.File(self.fname) as ff:
-#            d = { key : val[...] for key, val in ff.items() }
-#            self.__init_unpack_parameters__(d)
+    def save_h5(self):
+        """
+        Saves the attributes of self whose names show up as keys in self.parameters.
+        """
+        strife.h5py.save(self.data_filename,
+                         {key: getattr(self, key) for key in self.saved_attributes})
+    
+    def load_h5(self):
+        data = strife.h5py.load(self.data_filename)
+        self.__init_unpack_parameters__(data)
     
     def sample(self):
         joint_board = self.board[:, :, 0] + 2 * self.board[:, :, 1] + 4 * self.board[:, :, 2]
@@ -559,41 +554,31 @@ cpdef rotquad90(int[:,:,:] board, int direction, int[:] position):
     cdef int row_i, col_i, gene_i
     row_i, col_i, gene_i = 0, 0, 0
     cdef int row0, col0
-    row0 = position[0]
-    col0 = position[1]
+    row0, col0 = ( position[0],
+                   position[1] )
 
-    cdef int row1 = (row0 + 1) % board.shape[0]
-    cdef int col1 = (row0 + 1) % board.shape[1]
+    cdef int row1, col1 = ( (row0 + 1) % board.shape[0],
+                            (col0 + 1) % board.shape[1] )
 
     if direction == 0:
         for gene_i in range(3):
-            temp_value = board[row0, col0, gene_i]                 # A  B
-                                                                   # C  D
-
-            board[row0, col0, gene_i] = board[row0, col1, gene_i]  # B  B
-                                                                   # C  D
-
-            board[row0, col1, gene_i] = board[row1, col1, gene_i]  # B  D
-                                                                   # C  D
-
-            board[row1, col1, gene_i] = board[row1, col0, gene_i]  # B  D
-                                                                   # C  C
-
-            board[row1, col0, gene_i] = temp_value                 # B  C
-                                                                   # A  D
+            ( board[row0, col0, gene_i],
+              board[row0, col1, gene_i],
+              board[row1, col0, gene_i],
+              board[row1, col1, gene_i] ) = ( board[row0, col1, gene_i],
+                                              board[row1, col1, gene_i],
+                                              board[row0, col0, gene_i],
+                                              board[row1, col0, gene_i] )
+                                              # 00 01 -> 01 11
+                                              # 10 11 -> 00 10
     else:
         for gene_i in range(3):
-            temp_value = board[row0, col0, gene_i]                 # A  B
-                                                                   # C  D
-                                                                    
-            board[row0, col0, gene_i] = board[row1, col0, gene_i]  # C  B
-                                                                   # C  D
-                                                                     
-            board[row1, col0, gene_i] = board[row1, col1, gene_i]  # C  B
-                                                                   # D  D
-                                                                     
-            board[row1, col1, gene_i] = board[row0, col1, gene_i]  # C  B
-                                                                   # D  B
-                                                                     
-            board[row0, col1, gene_i] = temp_value                 # C  A
-                                                                   # D  B
+            ( board[row0, col0, gene_i],
+              board[row0, col1, gene_i],
+              board[row1, col0, gene_i],
+              board[row1, col1, gene_i] ) = ( board[row1, col0, gene_i],
+                                              board[row0, col0, gene_i],
+                                              board[row1, col1, gene_i],
+                                              board[row0, col1, gene_i] )
+                                              # 00 01 -> 10 00
+                                              # 10 11 -> 11 01
