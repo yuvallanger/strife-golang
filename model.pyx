@@ -147,13 +147,12 @@ def init( config):
 ######
 ## functions
 ######
-cdef int signal_count(self, int row, int col, int signal):
-    cdef int[:,:,:] board = self.board
+cdef int signal_count(int row, int col, int signal):
     cdef int signal_sum, s_row_i, s_col_i
     signal_sum = 0
     for s_row_i in range(row - self.S_rad, row + self.S_rad + 1):
         for s_col_i in range(col - self.S_rad, col + self.S_rad + 1):
-            if board[s_row_i, s_col_i, SIGNAL] == signal:
+            if board_memview[s_row_i, s_col_i, SIGNAL] == signal:
                 signal_sum += 1
     return signal_sum
 
@@ -162,8 +161,6 @@ cdef int goods_count(int pos_row, int pos_col):
     Counts the number of public goods at a certain position
     '''
     cdef int s_row_i, s_col_i, g_row_i, g_col_i, goods_sum
-
-    cdef char[:,:,:] board = self.board
     
 #     has fitness effect?:
 #         surrounded by enough goods producing cells
@@ -179,11 +176,11 @@ cdef int goods_count(int pos_row, int pos_col):
         for g_col_i in range(pos_col - G_rad,
                              pos_col + G_rad + 1):
             # Able to produce public goods
-            if board[g_row_i % self.board_size,
+            if board_memview[g_row_i % self.board_size,
                      g_col_i % self.board_size,
                      COOPERATION] == 1:
                 # Isn't receptive
-                if board[g_row_i % self.board_size,
+                if board_memview[g_row_i % self.board_size,
                          g_col_i % self.board_size,
                          RECEPTOR] == 0:
                     goods_sum += 1
@@ -193,7 +190,6 @@ cdef int goods_count(int pos_row, int pos_col):
     return goods_sum
 
 cdef double fitness(self, pos_row, pos_col): 
-    cdef char[:,:,:] board = self.board
     cdef double result
     cdef int pos_row_t, pos_col_t
     pos_row_t, pos_col_t = (pos_row % self.board_size,
@@ -253,7 +249,7 @@ cdef copycell(self,
     dest_col_t = dest_col % self.board_size
 
     for i in range(3):
-        self.board[dest_row_t, dest_col_t, i] = self.board[orig_row_t, orig_col_t, i]
+        board_memview[dest_row_t, dest_col_t, i] = board_memview[orig_row_t, orig_col_t, i]
 
 def mutate(self, pos_row, pos_col, p_r, p_s, p_c):
     """
@@ -265,82 +261,84 @@ def mutate(self, pos_row, pos_col, p_r, p_s, p_c):
     pos_row_t = pos_row % self.board_size
     pos_col_t = pos_col % self.board_size
     if p_r < self.mutation_rate_r:
-        self.board[pos_row_t, pos_col_t, 0] = 0 if self.board[pos_row_t, pos_col_t, 0] else 1
+        board_memview[pos_row_t, pos_col_t, 0] = 0 if board_memview[pos_row_t, pos_col_t, 0] else 1
     if p_s < self.mutation_rate_s:
-        self.board[pos_row_t, pos_col_t, 1] = 0 if self.board[pos_row_t, pos_col_t, 1] else 1
+        board_memview[pos_row_t, pos_col_t, 1] = 0 if board_memview[pos_row_t, pos_col_t, 1] else 1
     if p_c < self.mutation_rate_c:
-        self.board[pos_row_t, pos_col_t, 2] = 0 if self.board[pos_row_t, pos_col_t, 2] else 1
+        board_memview[pos_row_t, pos_col_t, 2] = 0 if board_memview[pos_row_t, pos_col_t, 2] else 1
 
 def get_state(self):
     """
     The state of the simulation in a key, val dictionary.
     """
-    return {'S_cost': self.S_cost,
-            'R_cost': self.R_cost,
-            'C_cost': self.C_cost,
-            'baseline_cost': self.baseline_cost,
-            'benefit': self.benefit,
-            'mutation_rate_r': self.mutation_rate_r,
-            'mutation_rate_s': self.mutation_rate_s,
-            'mutation_rate_c': self.mutation_rate_c,
-            'S_th': self.S_th,
-            'G_th': self.G_th,
-            'diffusion_amount': self.diffusion_amount,
-            'S_rad': self.S_rad,
-            'G_rad': self.G_rad,
-            'generations': self.generations,
-            'board_size': self.board_size,
-            'step_count': self.step_count,
-            'steps_final': self.steps_final,
-            'board': self.board,
-            'genotype_num': self.genotype_num,
-            'steps_per_gen': self.steps_per_gen,
-            'samples_per_gen': self.samples_per_gen,
-            'samples_num': self.samples_num,
-            'samples_board_num': self.samples_board_num,
-            'steps_per_sample': self.steps_per_sample,
-            'steps_per_board_sample': self.steps_per_board_sample,
-            'sample_count': self.sample_count,
-            'samples_frequency': self.samples_frequency,
-            'samples_nhood': self.samples_nhood,
-            'samples_board': self.samples_board}
+    return {'S_cost': S_cost,
+            'R_cost': R_cost,
+            'C_cost': C_cost,
+            'baseline_cost': baseline_cost,
+            'benefit': benefit,
+            'mutation_rate_r': mutation_rate_r,
+            'mutation_rate_s': mutation_rate_s,
+            'mutation_rate_c': mutation_rate_c,
+            'S_th': S_th,
+            'G_th': G_th,
+            'diffusion_amount': diffusion_amount,
+            'S_rad': S_rad,
+            'G_rad': G_rad,
+            'generations': generations,
+            'board_size': board_size,
+            'step_count': step_count,
+            'steps_final': steps_final,
+            'board': board,
+            'genotype_num': genotype_num,
+            'steps_per_gen': steps_per_gen,
+            'samples_per_gen': samples_per_gen,
+            'samples_num': samples_num,
+            'samples_board_num': samples_board_num,
+            'steps_per_sample': steps_per_sample,
+            'steps_per_board_sample': steps_per_board_sample,
+            'sample_count': sample_count,
+            'samples_frequency': samples_frequency,
+            'samples_nhood': samples_nhood,
+            'samples_board': samples_board}
 
-def set_state(self, data):
+def set_state( data):
     """
     Sets the state of the simulation with a key, val dictionary holding the data.
     """
-    self.S_cost = data['S_cost']
-    self.R_cost = data['R_cost']
-    self.C_cost = data['C_cost']
-    self.baseline_cost = data['baseline_cost']
-    self.benefit = data['benefit']
-    self.mutation_rate_r = data['mutation_rate_r']
-    self.mutation_rate_s = data['mutation_rate_s']
-    self.mutation_rate_c = data['mutation_rate_c']
-    self.S_th = data['S_th']
-    self.G_th = data['G_th']
-    self.diffusion_amount = data['diffusion_amount']
-    self.S_rad = data['S_rad']
-    self.G_rad = data['G_rad']
-    self.generations = data['generations']
-    self.board_size = data['board_size']
-    self.step_count = data['step_count']
-    self.steps_final = data['steps_final']
-    self.board = data['board']
-    self.genotype_num = data['genotype_num']
-    self.steps_per_gen = data['steps_per_gen']
-    self.samples_per_gen = data['samples_per_gen']
-    self.samples_num = data['samples_num']
-    self.samples_board_num = data['samples_board_num']
-    self.steps_per_sample = data['steps_per_sample']
-    self.steps_per_board_sample = data['steps_per_board_sample']
-    self.sample_count = data['sample_count']
-    self.samples_frequency = data['samples_frequency']
-    self.samples_nhood = data['samples_nhood']
-    self.samples_board = data['samples_board']
+    global S_cost, R_cost, C_cost, baseline_cost, benefit, mutation_rate_r, mutation_rate_s, mutation_rate_c, S_th, G_th, diffusion_amount, S_rad, G_rad, generations, board_size, step_count, steps_final, board, board_memview, genotype_num, steps_per_gen, samples_per_gen, samples_num, samples_board_num, steps_per_sample, steps_per_board_sample, sample_count, samples_frequency, samples_nhood, samples_board
+    S_cost = data['S_cost']
+    R_cost = data['R_cost']
+    C_cost = data['C_cost']
+    baseline_cost = data['baseline_cost']
+    benefit = data['benefit']
+    mutation_rate_r = data['mutation_rate_r']
+    mutation_rate_s = data['mutation_rate_s']
+    mutation_rate_c = data['mutation_rate_c']
+    S_th = data['S_th']
+    G_th = data['G_th']
+    diffusion_amount = data['diffusion_amount']
+    S_rad = data['S_rad']
+    G_rad = data['G_rad']
+    generations = data['generations']
+    board_size = data['board_size']
+    step_count = data['step_count']
+    steps_final = data['steps_final']
+    board = data['board']
+    genotype_num = data['genotype_num']
+    steps_per_gen = data['steps_per_gen']
+    samples_per_gen = data['samples_per_gen']
+    samples_num = data['samples_num']
+    samples_board_num = data['samples_board_num']
+    steps_per_sample = data['steps_per_sample']
+    steps_per_board_sample = data['steps_per_board_sample']
+    sample_count = data['sample_count']
+    samples_frequency = data['samples_frequency']
+    samples_nhood = data['samples_nhood']
+    samples_board = data['samples_board']
 
-def sample(self):
-    joint_board = self.board[:, :, 0] + 2 * self.board[:, :, 1] + 4 * self.board[:, :, 2]
+def sample():
+    global samples_nhood, samples_frequency, sample_count
+    joint_board = board[:, :, 0] + 2 * board[:, :, 1] + 4 * board[:, :, 2]
     for gene in range(8):
         gene_board = joint_board == gene
         gene_frequency = np.sum(gene_board)
@@ -349,9 +347,9 @@ def sample(self):
             nh_board = joint_board == nh_gene
             nh_gene_count = sp.signal.convolve2d(nh_board, np.ones((3,3)), mode='same', boundary='wrap')
             nh_gene_count_of_gene = np.sum(nh_gene_count * gene_board, dtype=np.int32)
-            self.samples_nhood[self.sample_count, gene, nh_gene] = nh_gene_count_of_gene
-        self.samples_frequency[self.sample_count, gene] = gene_frequency
-    self.sample_count += 1
+            samples_nhood[sample_count, gene, nh_gene] = nh_gene_count_of_gene
+        samples_frequency[sample_count, gene] = gene_frequency
+    sample_count += 1
 
 cdef int rel_pos_find(self, int i, int axis):
     if i == 0:
