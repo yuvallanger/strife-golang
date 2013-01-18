@@ -6,6 +6,7 @@ A model by Dr. Avigdor Eldar based on Czárán's work.
 http://www.plosone.org/article/info:doi/10.1371/journal.pone.0006655
 """
 
+from __future__ import division
 import os
 import time
 import scipy as sp
@@ -14,41 +15,46 @@ import scipy.signal
 import scipy.weave
 import numpy as np
 import pylab as pl
-import timeit
 import sys
 import numba
+import ConfigParser
+import pymt64
+import random
 
 usage = '''
 {0}: A model
 
 {0} <-h>
-    <-d/--datefile> [data_filename.h5] <-c/--config> [config_filename]
+    <-d/--datefile> [data_filename.h5] <-c/--config> [conf_filename]
 '''
 
 RECEPTOR = 0
 SIGNAL = 1
 COOPERATION = 2
 
-def load_config(config_filename, default_config):
+def load_config(conf_filename, default_config):
     """
     Takes a string holding filename and returns a dictionary with all the configuration values.
     """
     our_config = default_config
-    if config_filename is None:
+    print our_config, conf_filename
+    if conf_filename is None:
         return our_config
 
     config = ConfigParser.SafeConfigParser()
-    config.read(config_filename)
+    config.read(conf_filename)
 
     for key, val in our_config.items():
+        print key, val
         our_config[key] = config.get('Config', key)
+    print our_config
 
     return our_config
 
 default_config = {
-        'S_COST':                1,   # Metabolic cost of signalling
-        'R_COST':                3,   # Metabolic cost of having a receptor
-        'C_COST':                30,  # Metabolic cost of being cooperative
+        'S_cost':                1,   # Metabolic cost of signalling
+        'R_cost':                3,   # Metabolic cost of having a receptor
+        'C_cost':                30,  # Metabolic cost of being cooperative
         'baseline_cost':         100, # Basal metabolic cost
 
         'benefit':               0.9, # The fraction reduced, out of total metabolic cost, when
@@ -76,32 +82,73 @@ default_config = {
         'data_filename': 'default.npz'}
 
 
-data_filename = default_config['data_filename']
 conf_filename = None
-
-default_config_filename = 'default.conf'
-if os.path.exists(default_config_filename):
-    conf_filename = default_config_filename
+data_filename = None
+default_conf_filename = 'default.conf'
+if os.path.exists(default_conf_filename):
+    print "default_conf_filename exists", default_conf_filename
+    conf_filename = default_conf_filename
 
 for i, arg in enumerate(sys.argv):
+    print i, arg
     if arg in ('--help', '-h'):
+        print "arg in ('--help', '-h')", arg
         raise usage
     if arg in ('--data', '-d'):
-        print arg, sys.argv[i+1]
+        print "arg in ('--data', '-d')", arg, sys.argv[i+1]
         data_filename = sys.argv[i+1]
     if arg in ('--config', '-c'):
-        print arg, sys.argv[i+1]
+        print "arg in ('--config', '-c')", arg, sys.argv[i+1]
         conf_filename = sys.argv[i+1]
 
 config = load_config(conf_filename, default_config)
-config['data_filename'] = data_filename
+if data_filename is None and conf_filename is None:
+        data_filename = default_config['data_filename']
+
+def get_state():
+    """
+    The state of the simulation in a key, val dictionary.
+    """
+    return {'S_cost': S_cost,
+            'R_cost': R_cost,
+            'C_cost': C_cost,
+            'baseline_cost': baseline_cost,
+            'benefit': benefit,
+            'mutation_rate_r': mutation_rate_r,
+            'mutation_rate_s': mutation_rate_s,
+            'mutation_rate_c': mutation_rate_c,
+            'S_th': S_th,
+            'G_th': G_th,
+            'diffusion_amount': diffusion_amount,
+            'S_rad': S_rad,
+            'G_rad': G_rad,
+            'generations': generations,
+            'board_size': board_size,
+            'step_count': step_count,
+            'steps_final': steps_final,
+            'board': board,
+            'genotype_num': genotype_num,
+            'steps_per_gen': steps_per_gen,
+            'samples_per_gen': samples_per_gen,
+            'samples_num': samples_num,
+            'samples_board_num': samples_board_num,
+            'steps_per_sample': steps_per_sample,
+            'steps_per_board_sample': steps_per_board_sample,
+            'sample_count': sample_count,
+            'samples_frequency': samples_frequency,
+            'samples_nhood': samples_nhood,
+            'samples_board': samples_board,
+            'mt': mt}
+
 
 if os.path.exists(config['data_filename']):
-    data = np.load(config['data_filename']).items()
+    print "there's a data file", config['data_filename']
+    data = {key: val for key, val in np.load(config['data_filename']).items()}
 
-    S_COST = data['S_COST']
-    R_COST = data['R_COST']
-    C_COST = data['C_COST']
+    mt = data['mt']
+    S_cost = data['S_cost']
+    R_cost = data['R_cost']
+    C_cost = data['C_cost']
     baseline_cost = data['baseline_cost']
     benefit = data['benefit']
     mutation_rate_r = data['mutation_rate_r']
@@ -128,17 +175,17 @@ if os.path.exists(config['data_filename']):
     samples_frequency = data['samples_frequency']
     samples_nhood = data['samples_nhood']
     samples_board = data['samples_board']
-    go()
 else:
+    print "there isn't a data file", config['data_filename']
     #########
     # model parameters,
     #########
 
     #######
     # Cost of gene expression
-    S_COST = int(config['S_COST'])
-    R_COST = int(config['R_COST'])
-    C_COST = int(config['C_COST'])
+    S_cost = int(config['S_cost'])
+    R_cost = int(config['R_cost'])
+    C_cost = int(config['C_cost'])
 
     # B for Baseline, basal, "basic metabolic burden"
     baseline_cost = int(config['baseline_cost'])
@@ -158,9 +205,12 @@ else:
     # quorum threshold
     G_th = int(config['G_th'])
     # Cooperation threshold. Above it, public goods makes a difference.
+    
+    board_size = int(config['board_size'])
 
     ## Probability of each single diffusion operation
     diffusion_amount = float(config['diffusion_amount'])
+    diffusion_step_num = int((board_size ** 2) * diffusion_amount) // 4
 
     #######
     # radius of Signal or Cooperation effects.
@@ -169,12 +219,6 @@ else:
 
     generations = int(config['generations'])
 
-    print globals()['board_size']
-    print int(config['board_size'])
-    globals()['board_size'] = int(config['board_size'])
-    print globals()['board_size']
-    print int(config['board_size'])
-    raw_input()
 
     #####
     # settings
@@ -201,6 +245,7 @@ else:
     S = np.int8(S)
     C = np.int8(C)
     board = np.array([R, S, C]).transpose((1,2,0))
+    print "board", type(board), board.dtype
 
     # TODO do whole board sum
     # S_sum = np.empty((board_size, board_size),
@@ -212,7 +257,7 @@ else:
     steps_per_gen = int(board_size ** 2)
     samples_per_gen = int(1)
     samples_num = int(samples_per_gen * generations)
-    samples_board_num = int(samples_num // 10)
+    samples_board_num = int(samples_num // 100)
     steps_per_sample = int(np.floor(1.0 * steps_per_gen // samples_per_gen))
     steps_per_board_sample = int(10 * steps_per_sample)
     sample_count = int(0)
@@ -220,32 +265,16 @@ else:
     samples_frequency = np.empty((samples_num, genotype_num), dtype=int)
     samples_nhood = np.empty((samples_num, genotype_num, genotype_num), dtype=int)
     samples_board = np.empty((samples_board_num, board_size, board_size, 3), dtype=np.int8)
-    np.savez(config['data_filename'], **model.get_state())
+
+    mt = pymt64.init(0)
+    print mt.dtype
+
+    randomrng = random.Random(0)
+
+    np.savez(config['data_filename'], **get_state())
 
 ###########################
 
-S_COST = R_COST = C_COST = S_th = G_th = S_rad = G_rad = generations = \
-genotype_num = steps_per_gen = \
-samples_per_gen = samples_num = samples_board_num = steps_per_sample = \
-steps_per_board_sample = sample_count = \
-        board_size = step_count = steps_final = int(0)
-
-baseline_cost = benefit = mutation_rate_r = mutation_rate_s = mutation_rate_c = \
-        diffusion_amount = 1.0
-
-board = np.empty((1,1,1), dtype='int8')
-samples_frequency = np.empty((1,1), dtype='int32')
-samples_nhood = np.empty((1,1,1), dtype='int32')
-samples_board = np.empty((1,1,1,1), dtype='int8')
-
-def init(config):
-    global S_COST, R_COST, C_COST, baseline_cost, benefit, mutation_rate_r, \
-           mutation_rate_s, mutation_rate_c, S_th, G_th, diffusion_amount, \
-           S_rad, G_rad, generations, board_size, step_count, steps_final, \
-           board, genotype_num, steps_per_gen, \
-           samples_per_gen, samples_num, samples_board_num, steps_per_sample, \
-           steps_per_board_sample, sample_count, samples_frequency, \
-           samples_nhood, samples_board
 
 ######
 ## functions
@@ -307,6 +336,7 @@ def fitness(pos_row, pos_col, p):
     return result
 
 
+#numba.jit('void(i8,i8,i8,i8,float64,float64'))
 def competition(c_pos_1_row,
                 c_pos_1_col,
                 c_pos_2_row,
@@ -358,9 +388,8 @@ def copycell(board, orig_row, orig_col,
     return board
 
 
-@numba.jit('void(int8[:,:,:],int32,int32,float64,float64,float64)')
+#@numba.jit('int8[:,:,:](int8[:,:,:],int32,int32,float64,float64,float64)')
 def mutate(board, pos_row, pos_col, p_r, p_s, p_c):
-    raw_input((type(pos_row), type(pos_col), type(p_r), type(p_s), type(p_c),board_size))
     """
     mutate(board, self, pos) -> NoneType
 
@@ -387,47 +416,6 @@ def mutate(board, pos_row, pos_col, p_r, p_s, p_c):
     return board
 
 
-def get_state():
-    """
-    The state of the simulation in a key, val dictionary.
-    """
-    return {'S_COST': S_COST,
-            'R_COST': R_COST,
-            'C_COST': C_COST,
-            'baseline_cost': baseline_cost,
-            'benefit': benefit,
-            'mutation_rate_r': mutation_rate_r,
-            'mutation_rate_s': mutation_rate_s,
-            'mutation_rate_c': mutation_rate_c,
-            'S_th': S_th,
-            'G_th': G_th,
-            'diffusion_amount': diffusion_amount,
-            'S_rad': S_rad,
-            'G_rad': G_rad,
-            'generations': generations,
-            'board_size': board_size,
-            'step_count': step_count,
-            'steps_final': steps_final,
-            'board': board,
-            'genotype_num': genotype_num,
-            'steps_per_gen': steps_per_gen,
-            'samples_per_gen': samples_per_gen,
-            'samples_num': samples_num,
-            'samples_board_num': samples_board_num,
-            'steps_per_sample': steps_per_sample,
-            'steps_per_board_sample': steps_per_board_sample,
-            'sample_count': sample_count,
-            'samples_frequency': samples_frequency,
-            'samples_nhood': samples_nhood,
-            'samples_board': samples_board}
-
-
-def set_state( data):
-    """
-    Sets the state of the simulation with a key, val dictionary holding the data.
-    """
-    global S_COST, R_COST, C_COST, baseline_cost, benefit, mutation_rate_r, mutation_rate_s, mutation_rate_c, S_th, G_th, diffusion_amount, S_rad, G_rad, generations, board_size, step_count, steps_final, board, genotype_num, steps_per_gen, samples_per_gen, samples_num, samples_board_num, steps_per_sample, steps_per_board_sample, sample_count, samples_frequency, samples_nhood, samples_board
-
 def sample():
     global samples_nhood, samples_frequency, sample_count
     joint_board = board[:, :, 0] + 2 * board[:, :, 1] + 4 * board[:, :, 2]
@@ -447,78 +435,157 @@ def sample():
     sample_count += 1
 
 
+#@numba.autojit
+def rel_pos_find(a, b, directions):
+    """
+    Takes two (n, 2) integer arrays (*a* and *b*), and according to a (n,) integers array holding the numbers [0,4] denoting directions.
+    """
+    code = '''
+    int i = 0;
+    for (i = 0; i < Na[0]; i++) {
+        if (DIRECTIONS1(i) == 0) {
+            B2(i, 0) = pyModulus(A2(i, 0) - 1, board_size);
+            B2(i, 1) = A2(i, 1);
+            continue;
+        }
+        if (DIRECTIONS1(i) == 1) {
+            B2(i, 0) = A2(i, 0);
+            B2(i, 1) = pyModulus(A2(i, 1) - 1, board_size);
+            continue;
+        }
+        if (DIRECTIONS1(i) == 2) {
+            B2(i, 0) = pyModulus(A2(i, 0) + 1, board_size);
+            B2(i, 1) = A2(i, 1);
+            continue;
+        }
+        B2(i, 0) = A2(i, 0);
+        B2(i, 1) = pyModulus(A2(i, 1) + 1, board_size);
+    }
+    '''
 
-def rel_pos_find(i, axis):
-    if i == 0:
-        if axis == 0:
-            return -1
-        else:
-            return 0
-    elif i == 0:
-        if axis == 0:
-            return 0
-        else:
-            return -1
-    elif i == 0:
-        if axis == 0:
-            return 1
-        else:
-            return 0
-    else:
-        if axis == 0:
-            return 0
-        else:
-            return 1
+    support_code = r'''
+    int pyModulus(int a, int b) {
+        return ((a % b) + b) % b;
+    }
+    '''
 
+    sp.weave.inline(code, ['a', 'b', 'directions', 'board_size'], support_code=support_code)
 
-#@numba.jit('i8[:,:,:](i8[:,:,:])')
-def competitionstep(board):
-    pos_1s = np.random.randint(board_size, size=(board_size ** 2, 2))
-    rel_pos_s = np.random.randint(4, size=(board_size ** 2))
-    p_pairs = np.random.rand(board_size ** 2, 2)
-    p_muts = np.random.rand(board_size ** 2, 3)
+#@numba.jit('int64(uint64[:],int32,int32)')
+def pymt64randint(mt, b, n):
+    return np.int64(np.floor(pymt64.uniform(mt, n) * b))
+    
+
+@numba.autojit#('void(int8[:,:,:],uint64[:])')
+def competitionstep(board, mt):
+    pos_1s = pymt64randint(mt, board_size, 2 * board_size ** 2).reshape((board_size ** 2, 2))
+    rel_pos_s = pymt64randint(mt, 4, board_size ** 2)
+    p_pairs = pymt64.uniform(mt, 2 * board_size ** 2).reshape((board_size ** 2, 2))
+    p_muts = pymt64.uniform(mt, 3 * board_size ** 2).reshape((board_size ** 2, 3))
+    pos_2s = np.empty((board_size ** 2, 2), dtype=pos_1s.dtype)
+    rel_pos_find(pos_1s, pos_2s, rel_pos_s)
     for i in range(board_size ** 2):
-        print i
-        pos_2_row = pos_1s[i, 0] + rel_pos_find(rel_pos_s[i], 0)
-        pos_2_col = pos_1s[i, 1] + rel_pos_find(rel_pos_s[i], 1)
-        pos_2t_row = pos_2_row % board_size
-        pos_2t_col = pos_2_col % board_size
+        pass
+        #pos_1_row = np.random.randint(board_size) #, size=(board_size ** 2, 2))
+        #pos_1_col = np.random.randint(board_size)
+        #rel_pos = np.random.randint(4) #, size=(board_size ** 2))
+        #pos_2t_row = pos_2_row % board_size
+        #pos_2t_col = pos_2_col % board_size
 
-        if (board[pos_1s[i, 0], pos_1s[i, 1], :] == board[pos_2t_row, pos_2t_col, :]).all():
-            board = mutate(board, pos_1s[i, 0],
-                   pos_1s[i, 1],
-                   p_muts[i, 0],
-                   p_muts[i, 1],
-                   p_muts[i, 2])
-            continue
+        #if (board[pos_1s[i, 0], pos_1s[i, 1]] == board[pos_2t_row, pos_2t_col]).all():
+        #    mutate(board, pos_1s[i, 0],
+        #           pos_1s[i, 1],
+        #           p_muts[i, 0],
+        #           p_muts[i, 1],
+        #           p_muts[i, 2])
+        #    continue
 
-        winner = competition(pos_1s[i, 0],
-                                  pos_1s[i, 1],
-                                  pos_2_row,
-                                  pos_2_col,
-                                  p_pairs[i, 0],
-                                  p_pairs[i, 1])
-        if winner == 1:
-            board[pos_2_row, pos_2_col, :] = board[pos_1s[i, 0], pos_1s[i, 1], :]
-            board = mutate(board, pos_2_row,
-                        pos_2_col,
-                        p_muts[i, 0],
-                        p_muts[i, 1],
-                        p_muts[i, 2])
-        else:
-            board = copycell(board, pos_2_row,
-                          pos_2_col,
-                          pos_1s[i, 0],
-                          pos_1s[i, 1])
-            board = mutate(board, pos_1s[i, 0],
-                        pos_1s[i, 1],
-                        p_muts[i, 0],
-                        p_muts[i, 1],
-                        p_muts[i, 2])
-    return board
+        #winner = competition(pos_1s[i, 0],
+        #                          pos_1s[i, 1],
+        #                          pos_2_row,
+        #                          pos_2_col,
+        #                          p_pairs[i, 0],
+        #                          p_pairs[i, 1])
+    #    p_pair = np.random.rand(2)
+    #    p_muts = np.random.rand(3)
+#        if winner == 1:
+#            board[pos_2_row, pos_2_col, :] = board[pos_1s[i, 0], pos_1s[i, 1], :]
+#            mutate(board, pos_2_row,
+#                        pos_2_col,
+#                        p_muts[i, 0],
+#                        p_muts[i, 1],
+#                        p_muts[i, 2])
+#        else:
+#            copycell(board, pos_2_row,
+#                          pos_2_col,
+#                          pos_1s[i, 0],
+#                          pos_1s[i, 1])
+#            mutate(board, pos_1s[i, 0],
+#                        pos_1s[i, 1],
+#                        p_muts[i, 0],
+#                        p_muts[i, 1],
+#                        p_muts[i, 2])
 
-#@numba.jit('i8[:,:,:](i8[:,:,:])')
-def nextstep(board): #board, step_count):
+
+#@numba.autojit#('void(int8[:,:,:],int32,int32[:])')
+def rotquad90(board, diffusion_step_num, directions, positions):
+    """
+    rotquad90(self, direction, position) -> NoneType
+
+    Turns a 2 by 2 sub-array of self.board by 90 degrees.
+    Direction:
+        0 - turn anticlockwise
+        1 - turn clockwise
+    with its lowest valued coordinate (upper left) in the "position" coordinate value.
+    """
+    code = r'''
+    int row0, col0, row1, col1, i, gene_i, tmp; 
+    for (i = 0; i < (int) diffusion_step_num; i++) {
+        row0 = POS2(i, 0);
+        col0 = POS2(i, 1);
+        row1 = (row0 + 1) % Nboard[0];
+        col1 = (col0 + 1) % Nboard[1];
+        if DIRECTIONS1(i) {
+            for (gene_i = 0; gene_i < 3; gene_i++) {
+                tmp = BOARD3(row0, col0, gene_i);
+                BOARD3(row0, col0, gene_i) = BOARD3(row0, col1, gene_i);
+                BOARD3(row0, col1, gene_i) = BOARD3(row1, col1, gene_i);
+                BOARD3(row1, col1, gene_i) = BOARD3(row1, col0, gene_i);
+                BOARD3(row1, col0, gene_i) = tmp;
+                                                  // # 00 01 -> 01 11
+                                                  // # 10 11 -> 00 10
+            }
+        } else {
+            for (gene_i = 0; gene_i < 3; gene_i++) {
+                tmp = BOARD3(row0, col0, gene_i);
+                BOARD3(row0, col0, gene_i) = BOARD3(row1, col0, gene_i);
+                BOARD3(row1, col0, gene_i) = BOARD3(row1, col1, gene_i);
+                BOARD3(row1, col1, gene_i) = BOARD3(row0, col1, gene_i);
+                BOARD3(row0, col1, gene_i) = tmp;
+            }
+        }
+    }
+    '''
+
+    sp.weave.inline(code,
+                    ['pos', 'board', 'directions', 'diffusion_step_num'],
+                    {'pos': positions,
+                     'board': board,
+                     'directions': directions,
+                     'diffusion_step_num': diffusion_step_num})
+
+    #if direction < 0.5:
+    #    board[row0, col0, :], board[row0, col1, :], board[row1, col0, :], board[row1, col1, :] = board[row0, col1, :], board[row1, col1, :], board[row0, col0, :], board[row1, col0, :]
+    #                                          # 00 01 -> 01 11
+    #                                          # 10 11 -> 00 10
+    #else:
+    #    board[row0, col0, :], board[row0, col1, :], board[row1, col0, :], board[row1, col1, :] = board[row1, col0, :], board[row0, col0, :], board[row1, col1, :], board[row0, col1, :]
+    #                                          # 00 01 -> 10 00
+    #                                          # 10 11 -> 11 01
+
+
+@numba.autojit#('void(int8[:,:,:],uint64[:])') # , uint64[:])')
+def nextstep(board, mt):
 #    global step_count, board
 #    cdef int rel_pos_i, pos_1_row, pos_1_col, pos_2_row, pos_2_col, winner, pos_2t_row, pos_2t_col
 #    cdef double p_1, p_2, p_r, p_s, p_c
@@ -531,13 +598,10 @@ def nextstep(board): #board, step_count):
 #    cdef np.ndarray[np.double_t, ndim=2] p_muts
 #    cdef double[:,:] p_muts_memview
 #   pass 
-    board = competitionstep(board)
-
-    for i in range(int((board_size ** 2) * diffusion_amount) // 4):
-        direction = np.random.randint(2)
-        position = np.random.randint(board_size, size=2)
-        board = rotquad90(board, direction, position)
-    return board
+    competitionstep(board, mt)
+    directions = np.int8(np.floor(pymt64.uniform(mt, diffusion_step_num) * 2))
+    positions = np.int16(np.floor(pymt64.uniform(mt, 2 * diffusion_step_num) * board_size)).reshape((diffusion_step_num, 2))
+    rotquad90(board, diffusion_step_num, directions, positions)
 
 ## process data
 
@@ -558,65 +622,46 @@ def nextstep(board): #board, step_count):
 #                fillstyle='bottom')
 
 
-@numba.jit('void(int8[:,:,:],int32,int32[:])')
-def rotquad90(board, direction, position):
-    """
-    rotquad90(self, direction, position) -> NoneType
+#@numba.autojit#('void(i8[:,:,:],uint64[:],float64[:])')
+def go(board, mt, times):
+    #    every = 30*60
+    # TODO: Maybe add f and d somehow like in printf? {0}f {1}d
+    #    steps_a = a.step_count
+    print board_size, generations
+    times[0] = time.time()
+    for step_count in range(generations):
+        print step_count
+        nextstep(board, mt)
+        times[step_count + 1] = time.time()
+        print (times[step_count + 1] - times[step_count]) * 10000 / board_size**2 * 300**2 / 60 / 60
+        print np.average(times[1:step_count + 2] - times[:step_count+1]) * 10000 / board_size**2 * 300**2 / 60 / 60
+        #time.time()#1.0 * (time.time() - iter_start) / board_size**2 * 300**2 / 60 / 60 * 10000
+#        if not step_count % steps_per_sample:
+#            sample()
+#        if not step_count % steps_per_board_sample:
+#            board_sample_num = step_count // steps_per_board_sample
+#            samples_board[board_sample_num] = board
+#            delta_t = time.time() - t
+#            if delta_t > every:
+#                t = time.time()
+#                a.save_h5()
+#                steps_delta = a.step_count - steps_a
+#                steps_a = a.step_count
+#                eta = 1.0 * delta_t / (steps_delta+1) * (a.steps_final - a.step_count)
+#                print "t: {0:f}, approx. time to fin: {1:f}".format(t, eta)
+#                print "steps taken = {0}, steps since last save = {1}".format(a.step_count, steps_delta)
+    print board
+        
 
-    Turns a 2 by 2 sub-array of self.board by 90 degrees.
-    Direction:
-        0 - turn anticlockwise
-        1 - turn clockwise
-    with its lowest valued coordinate (upper left) in the "position" coordinate value.
-    """
+times = np.empty((generations+1), dtype=np.float64)
 
-    row0 = position[0]
-    col0 = position[1]
 
-    row1 = (row0 + 1) % board.shape[0]
-    col1 = (col0 + 1) % board.shape[1]
+go(board, mt, times)
 
-    if direction == 0:
-        for gene_i in range(3):
-            board[row0, col0, gene_i] = board[row0, col1, gene_i]
-            board[row0, col1, gene_i] = board[row1, col1, gene_i]
-            board[row1, col0, gene_i] = board[row0, col0, gene_i]
-            board[row1, col1, gene_i] = board[row1, col0, gene_i]
-                                              # 00 01 -> 01 11
-                                              # 10 11 -> 00 10
-    else:
-        for gene_i in range(3):
-            board[row0, col0, gene_i] = board[row1, col0, gene_i]
-            board[row0, col1, gene_i] = board[row0, col0, gene_i]
-            board[row1, col0, gene_i] = board[row1, col1, gene_i]
-            board[row1, col1, gene_i] = board[row0, col1, gene_i]
-                                              # 00 01 -> 10 00
-                                              # 10 11 -> 11 01
+l=[]
+for time_0, time_1 in zip(times[:-1], times[1:]):
+    l.append(time_1-time_0)
+print sum(l) / generations * 10000 / 10**2 * 300**2 / 60 / 60 
 
-print 'go!' * 10
-#    t = time.time()
-#    every = 30*60
-# TODO: Maybe add f and d somehow like in printf? {0}f {1}d
-#    print "t: {0:f}, steps thus far: {1}".format(t, a.step_count)
-#    steps_a = a.step_count
-for step_count in range(5):  # range(model.generations):
-    print step_count
-    board = nextstep(board)
-    if not step_count % steps_per_sample:
-        sample()
-    if not step_count % steps_per_board_sample:
-        board_sample_num = step_count // steps_per_board_sample
-        samples_board[board_sample_num] = board
-    step_count += 1
-#        delta_t = time.time() - t
-#        if delta_t > every:
-#            t = time.time()
-#            a.save_h5()
-#            steps_delta = a.step_count - steps_a
-#            steps_a = a.step_count
-#            eta = 1.0 * delta_t / (steps_delta+1) * (a.steps_final - a.step_count)
-#            print "t: {0:f}, approx. time to fin: {1:f}".format(t, eta)
-#            print "steps taken = {0}, steps since last save = {1}".format(a.step_count, steps_delta)
-#            sys.exit(1)
-
-np.savez(config['data_filename'], **model.get_state())
+    
+np.savez(config['data_filename'], **get_state())
