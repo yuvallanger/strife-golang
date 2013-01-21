@@ -337,14 +337,13 @@ def fitness(pos_row, pos_col, p):
 
 
 #numba.jit('void(i8,i8,i8,i8,float64,float64'))
-def competition(c_pos_1_row,
-                c_pos_1_col,
-                c_pos_2_row,
-                c_pos_2_col,
+def competition(pair_i,
+                pos_1s,
+                pos_2s,
                 p_1,
                 p_2):
     """
-    competition(self, cell_pos_1, cell_pos_2, p_pair) -> (int, int)
+    competition(pair_i, pos_1s, pos_2s) -> (int, int)
 
     Decides which of the two positions wins.
 
@@ -352,17 +351,13 @@ def competition(c_pos_1_row,
     Takes two adjacent position coordinates on the board and each one's TODO: what's the name of such probability values?
     p_pair: an array of two uniform distribution over [0, 1).
     """
-#    cdef double score_1, score_2
-#    cdef int c_pos_2t_row, c_pos_2t_col
-    c_pos_2t_row = c_pos_2_row % board_size
-    c_pos_2t_col = c_pos_2_col % board_size
 
-    score_1 = p_1 * fitness(c_pos_1_row,
-                            c_pos_1_col,
+    score_1 = p_1 * fitness(pair_i,
+                            pos_1s,
                             p_1)
 
-    score_2 = p_2 * fitness(c_pos_2t_row,
-                            c_pos_2t_col,
+    score_2 = p_2 * fitness(pair_i,
+                            pos_2s,
                             p_2)
 
     return (1 if score_1 > score_2 else 2)
@@ -388,7 +383,7 @@ def copycell(board, orig_row, orig_col,
     return board
 
 
-#@numba.jit('int8[:,:,:](int8[:,:,:],int32,int32,float64,float64,float64)')
+@numba.jit('int8[:,:,:](int8[:,:,:],int32,int32,float64,float64,float64)')
 def mutate(board, pos_row, pos_col, p_r, p_s, p_c):
     """
     mutate(board, self, pos) -> NoneType
@@ -435,7 +430,7 @@ def sample():
     sample_count += 1
 
 
-#@numba.autojit
+@numba.autojit
 def rel_pos_find(a, b, directions):
     """
     Takes two (n, 2) integer arrays (*a* and *b*), and according to a (n,) integers array holding the numbers [0,4] denoting directions.
@@ -471,12 +466,18 @@ def rel_pos_find(a, b, directions):
 
     sp.weave.inline(code, ['a', 'b', 'directions', 'board_size'], support_code=support_code)
 
-#@numba.jit('int64(uint64[:],int32,int32)')
+@numba.jit('int64(uint64[:],int32,int32)')
 def pymt64randint(mt, b, n):
     return np.int64(np.floor(pymt64.uniform(mt, n) * b))
     
+@numba.autojit
+def same(board, pair_i, pos_1s, pos_2s):
+    for gene_i in range(3):
+        if board[pos_1s[pair_i, 0], pos_1s[pair_i, 1], gene_i] != board[pos_2s[pair_i, 0], pos_2s[pair_i, 1], gene_i]:
+            return 0
+    return 1
 
-@numba.autojit#('void(int8[:,:,:],uint64[:])')
+@numba.jit('void(int8[:,:,:],uint64[:])')
 def competitionstep(board, mt):
     pos_1s = pymt64randint(mt, board_size, 2 * board_size ** 2).reshape((board_size ** 2, 2))
     rel_pos_s = pymt64randint(mt, 4, board_size ** 2)
@@ -484,28 +485,41 @@ def competitionstep(board, mt):
     p_muts = pymt64.uniform(mt, 3 * board_size ** 2).reshape((board_size ** 2, 3))
     pos_2s = np.empty((board_size ** 2, 2), dtype=pos_1s.dtype)
     rel_pos_find(pos_1s, pos_2s, rel_pos_s)
-    for i in range(board_size ** 2):
-        pass
-        #pos_1_row = np.random.randint(board_size) #, size=(board_size ** 2, 2))
-        #pos_1_col = np.random.randint(board_size)
-        #rel_pos = np.random.randint(4) #, size=(board_size ** 2))
-        #pos_2t_row = pos_2_row % board_size
-        #pos_2t_col = pos_2_col % board_size
 
-        #if (board[pos_1s[i, 0], pos_1s[i, 1]] == board[pos_2t_row, pos_2t_col]).all():
-        #    mutate(board, pos_1s[i, 0],
-        #           pos_1s[i, 1],
-        #           p_muts[i, 0],
-        #           p_muts[i, 1],
-        #           p_muts[i, 2])
-        #    continue
+    sp.weave.inline(r'''
+    for (pair_i = 0; pair_i < cells_num; pair_i)
+    {
+        int ret_val;
+        int gene_i = 0;
+        //printf("pair_i: %d, ", pair_i);
+        return_val = ret_val;
+        for (gene_i = 0; gene_i < 3; gene_i++)
+        {
+            // printf("gene_i: %d, ", gene_i);
+            if (BOARD3(POS_1S2(pair_i, 0), POS_1S2(pair_i, 1), gene_i) != BOARD3(POS_2S2(pair_i, 0), POS_2S2(pair_i, 1), gene_i))
+            {
+                return_val = 0;
+                //printf("!=, ");
+                break;
+            }
+        }
+        return_val = ret_val;
+        //printf("ret_val: %d ", ret_val);
+        //printf("\n");
+    ''', ['pair_i', 'board', 'pos_1s', 'pos_2s'])
+        #if same(board, pair_i, pos_1s, pos_2s):
+        #    pass
+        #    #mutate(board, pos_1s[i, 0],
+        #    #       pos_1s[i, 1],
+        #    #       p_muts[i, 0],
+        #    #       p_muts[i, 1],
+        #    #       p_muts[i, 2])
+        #    #continue
 
-        #winner = competition(pos_1s[i, 0],
-        #                          pos_1s[i, 1],
-        #                          pos_2_row,
-        #                          pos_2_col,
-        #                          p_pairs[i, 0],
-        #                          p_pairs[i, 1])
+    winner = competition(pair_i,
+                            pos_1s,
+                            pos_2s,
+                            p_pairs)
     #    p_pair = np.random.rand(2)
     #    p_muts = np.random.rand(3)
 #        if winner == 1:
@@ -527,7 +541,7 @@ def competitionstep(board, mt):
 #                        p_muts[i, 2])
 
 
-#@numba.autojit#('void(int8[:,:,:],int32,int32[:])')
+@numba.autojit#('void(int8[:,:,:],int32,int32[:])')
 def rotquad90(board, diffusion_step_num, directions, positions):
     """
     rotquad90(self, direction, position) -> NoneType
@@ -622,7 +636,7 @@ def nextstep(board, mt):
 #                fillstyle='bottom')
 
 
-#@numba.autojit#('void(i8[:,:,:],uint64[:],float64[:])')
+@numba.autojit#('void(i8[:,:,:],uint64[:],float64[:])')
 def go(board, mt, times):
     #    every = 30*60
     # TODO: Maybe add f and d somehow like in printf? {0}f {1}d
