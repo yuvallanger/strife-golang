@@ -140,7 +140,10 @@ def get_state():
               'board_size': board_size,
               'step_count': step_count,
               'steps_final': steps_final,
-              'board': board,
+              'board_strain': board_strain,
+              'board_signal_num': board_signal_num,
+              'board_pg_num': board_pg_num,
+              'board_prod': board_prod,
               'genotype_num': genotype_num,
               'steps_per_gen': steps_per_gen,
               'samples_per_gen': samples_per_gen,
@@ -274,15 +277,13 @@ else:
     # A cell can be Signalling and/or Receptive and/or Cooperative
     R = np.random.rand(board_size, board_size) < float(config['initial_receptives_amount'])
     S = np.random.rand(board_size, board_size) < float(config['initial_signallers_amount'])
-    C = np.random.rand(board_size, board_size) < float(config['initial_cooperators_amount'])
     R = np.int8(R)
     S = np.int8(S)
-    C = np.int8(C)
     print R
     print S
     print C
-    board = np.array([R, S, C]).transpose((1,2,0))
-    print "board", type(board), board.dtype
+    board_strain = R + 2 * S
+    print "board_strain", type(board_strain), board_strain.dtype
     for i in range(3):
         print board[:,:,i]
 
