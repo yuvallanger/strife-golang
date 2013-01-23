@@ -32,6 +32,41 @@ RECEPTOR = 0
 SIGNAL = 1
 COOPERATION = 2
 
+s4strain = np.array([0, 0, 1, 1], dtype='int8')  # 0: S0, 1: S0, 2: S1, 3: S1 
+r4strain = np.array([0, 1, 0, 1], dtype='int8')  # 0: R0, 1: R1, 2: R0, 3: R1
+strain_spec = np.array([[0, 2],
+                        [1, 3]], dtype='int8')  # r, s
+
+def init_boards(board_strain, S_th, G_th, S_rad, G_rad):
+    board_signal_num = np.zeros((board_strain[0], board_strain.shape[1]), dtype='int8')
+    board_prod = np.zeros((board_strain[0], board_strain[1]), dtype='int8')
+    board_pg_num = np.zeros((board_strain[0], board_strain.shape[1]), dtype='int8')
+
+    for row_center_i in range(board_strain.shape[0]):
+        for col_center_i in range(board_strain.shape[1]):
+            for row_rad_i in range(row_center_i - S_rad, row_center_i + S_rad + 1):
+                for col_rad_i in range(col_center_i - S_rad, col_center_i + S_rad + 1):
+                    board_signal_num[s4strain[board_strain[row_rad_i % board_strain.shape[0],
+                                                           col_rad_i % board_strain.shape[1]]],
+                                     row_center_i,
+                                     col_center_i] += 1
+    for row_center_i in range(board_strain.shape[0]):
+        for col_center_i in range(board_strain.shape[1]):
+            receptor_strain = r4strain[board_strain[row_center_i,
+                                                    col_center_i]]
+            board_prod[row_center_i, col_center_i] = board_signal_num[receptor_strain,
+                                                                      row_center_i,
+                                                                      col_center_i] >= S_th
+
+    for row_center_i in range(board_strain.shape[0]):
+        for col_center_i in range(board_strain.shape[1]):
+            for row_rad_i in range(row_center_i - G_rad, row_center_i + G_rad + 1):
+                for col_rad_i in range(col_center_i - G_rad, col_center_i + G_rad + 1):
+                    board_pg_num[row_center_i, col_center_i] += (board_prod[row_rad_i, col_rad_i] >= G_th)
+
+    return board_signal_num, board_prod, board_pg_num
+
+
 @numba.jit('i8[:](u8[:],i8,i8)')
 def pymt64randint(mt, b, n):
     """
@@ -142,8 +177,8 @@ def get_state():
               'steps_final': steps_final,
               'board_strain': board_strain,
               'board_signal_num': board_signal_num,
-              'board_pg_num': board_pg_num,
               'board_prod': board_prod,
+              'board_pg_num': board_pg_num,
               'genotype_num': genotype_num,
               'steps_per_gen': steps_per_gen,
               'samples_per_gen': samples_per_gen,
@@ -162,7 +197,9 @@ def get_state():
 
 
 
+# Either load an existing simulation, or create a new one.
 if os.path.exists(config['data_filename']):
+    # load an existing simulation
     print 'os.path.exists(' + config['data_filename'] + ')'
     data = {key: val for key, val in np.load(config['data_filename']).items()}
 
@@ -185,7 +222,10 @@ if os.path.exists(config['data_filename']):
     board_size = data['board_size']
     step_count = data['step_count']
     steps_final = data['steps_final']
-    board = data['board']
+    board_strain = data['board_strain']
+    board_signal_num = data['board_signal_num']
+    board_pg_num = data['board_pg_num']
+    board_prod = data['board_prod']
     genotype_num = data['genotype_num']
     steps_per_gen = data['steps_per_gen']
     samples_per_gen = data['samples_per_gen']
@@ -208,8 +248,8 @@ if os.path.exists(config['data_filename']):
                         data['randomstate_current_2'],
                         data['randomstate_current_3'],
                         data['randomstate_current_4'])
-    np.random.set_state(randomstate)
 else:
+    # Create / initiate a new simulation
     print 'os.path.exists(' + config['data_filename'] + ')'
     #########
     # model parameters,
@@ -272,7 +312,7 @@ else:
     steps_final = int(generations * board_size**2)
 
     np.random.seed(0)
-    randomstate_0 = np.random.get_state()
+    randomstate_start = np.random.get_state()
 
     # A cell can be Signalling and/or Receptive and/or Cooperative
     R = np.random.rand(board_size, board_size) < float(config['initial_receptives_amount'])
@@ -281,11 +321,11 @@ else:
     S = np.int8(S)
     print R
     print S
-    print C
     board_strain = R + 2 * S
     print "board_strain", type(board_strain), board_strain.dtype
-    for i in range(3):
-        print board[:,:,i]
+    print board_strain
+
+    board_signal_num, board_prod, board_pg_num = init_boards(board_strain, s4strain, S_th, G_th)
 
     # TODO do whole board sum
     # S_sum = np.empty((board_size, board_size),
@@ -467,6 +507,8 @@ def mutate(board, pos_row, pos_col, p_r, p_s, p_c):
     """
     pos_row_t = pos_row % board_size
     pos_col_t = pos_col % board_size
+    strain = board_strain[pos_row, pos_col]
+    r = r4strain[strain]
     if float(p_r) < float(mutation_rate_r):
         if board[pos_row_t, pos_col_t, 0]:
             board[pos_row_t, pos_col_t, 0] = 0
