@@ -13,11 +13,11 @@ func main() {
 
 	init_boards(model)
 
-	fmt.Println("Board strain:\n", model.Board_strain)
+	//fmt.Println("Board strain:\n", model.Board_strain)
 
 	run(model)
 
-	fmt.Println("Board strain:\n", model.Board_strain)
+	//fmt.Println("Board strain:\n", model.Board_strain)
 	fmt.Println("model.params:\n", model.Parameters)
 	fmt.Println("model.settings:\n", model.Settings)
 }

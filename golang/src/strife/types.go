@@ -39,7 +39,7 @@ type Parameters_T struct {
 	SRad        int
 	CRad        int
 	BoardSize   int
-	D           int
+	D           float64
 	MutOddsR    float64
 	MutOddsS    float64
 }
@@ -56,17 +56,18 @@ type Config struct {
 func (board_strain Board_strain) String() (s string) {
 	miscow.Trace("(Board_strain) String()")
 	defer miscow.Untrace("(Board_strain) String()")
-	s = ""
-	for _, gene := range [2]int{1, 2} {
-		s += fmt.Sprintf("gene %v\n", gene)
-		for i0, v0 := range board_strain {
-			s += fmt.Sprintf("%v: ", i0)
-			for i1, v1 := range v0 {
-				s += fmt.Sprintf("(%v,%v) ", i1, (v1&gene)/gene)
-			}
-			s += fmt.Sprintf("\n")
-		}
-	}
+	s = " "
+    for i := range board_strain {
+        s += fmt.Sprintf("%2v", i)
+    }
+    s += "\n"
+    for i0, v0 := range board_strain {
+        s += fmt.Sprintf("%v: ", i0)
+        for _, v1 := range v0 {
+            s += fmt.Sprintf("%v ", v1)
+        }
+        s += fmt.Sprintf("\n")
+    }
 	s += "\n"
 	return
 }

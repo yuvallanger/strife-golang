@@ -14,10 +14,6 @@ func strain_spec(r, s int) int {
 	return r + s*2
 }
 
-func myMod(a, b int) int {
-	return ((a % b) + b) % b
-}
-
 func load_config() (parameters *Parameters_T, settings *Settings_T) {
 	var cfg Config
 	err := gcfg.ReadFileInto(&cfg, "strife.conf")
@@ -65,16 +61,22 @@ func update_arrays(model *Model, row, col, newstrain, oldstrain int) {
 	s_th = model.Parameters.STh
 	board_size = model.Parameters.BoardSize
 
+	(func([]int) {})([]int{
+		s_row_i, s_col_i, s_row_i_t, s_col_i_t,
+		c_row_i, c_col_i, c_row_i_t, c_col_i_t,
+		s_rad, c_rad, s_th, board_size,
+		oldprod})
 	for s_row_i = row - s_rad; s_row_i <= col+s_rad; s_row_i++ {
 		for s_col_i = col - s_rad; s_col_i <= col+s_rad; s_col_i++ {
-			s_row_i_t = myMod(s_row_i, board_size)
-			s_col_i_t = myMod(s_col_i, board_size)
+			s_row_i_t = miscow.MyMod(s_row_i, board_size)
+			s_col_i_t = miscow.MyMod(s_col_i, board_size)
 			// update signal level in sig range
 			(*model.Board_signal_num)[s4strain[oldstrain]][s_row_i_t][s_col_i_t]--
 			(*model.Board_signal_num)[s4strain[newstrain]][s_row_i_t][s_col_i_t]++
 			// update producer status in sig range
 			oldprod = (*model.Board_prod)[s_row_i_t][s_col_i_t]
 			neighbor_strain := (*model.Board_strain)[s_row_i_t][s_col_i_t]
+			(func(int) {})(neighbor_strain)
 			if s_th <= (*model.Board_signal_num)[r4strain[neighbor_strain]][s_row_i_t][s_col_i_t] {
 				(*model.Board_prod)[s_row_i_t][s_col_i_t] = 1
 			} else {
@@ -82,8 +84,8 @@ func update_arrays(model *Model, row, col, newstrain, oldstrain int) {
 			}
 			// update pg level in sig+pg range
 			if oldprod != (*model.Board_prod)[s_row_i_t][s_col_i_t] {
-				for c_row_i = c_row_i_t - c_rad; c_row_i <= c_row_i_t+c_rad; c_row_i++ {
-					for c_col_i = c_col_i_t - c_rad; c_col_i <= c_col_i_t+c_rad; c_col_i++ {
+				for c_row_i = s_row_i_t - c_rad; c_row_i <= s_row_i_t+c_rad; c_row_i++ {
+					for c_col_i = s_col_i_t - c_rad; c_col_i <= s_col_i_t+c_rad; c_col_i++ {
 						c_row_i_t = (c_row_i + board_size) % board_size
 						c_col_i_t = (c_col_i + board_size) % board_size
 						(*model.Board_pg_num)[c_row_i_t][c_col_i_t] += ((*model.Board_prod)[s_row_i_t][s_col_i_t] - oldprod)
@@ -114,15 +116,15 @@ func competition(model *Model) {
 	switch direction := rand.Intn(4); direction {
 	case 0:
 		c2r = c1r
-		c2c = myMod(c1c-1, model.Parameters.BoardSize)
+		c2c = miscow.MyMod(c1c-1, model.Parameters.BoardSize)
 	case 1:
-		c2r = myMod(c1r-1, model.Parameters.BoardSize)
+		c2r = miscow.MyMod(c1r-1, model.Parameters.BoardSize)
 		c2c = c2r
 	case 2:
 		c2r = c1r
-		c2c = myMod(c1c+1, model.Parameters.BoardSize)
+		c2c = miscow.MyMod(c1c+1, model.Parameters.BoardSize)
 	case 3:
-		c2r = myMod(c1r+1, model.Parameters.BoardSize)
+		c2r = miscow.MyMod(c1r+1, model.Parameters.BoardSize)
 		c2c = c2r
 	}
 	score_1 := score(c1r, c1c, rand.Float64())
@@ -136,56 +138,85 @@ func competition(model *Model) {
 
 func diffuse(model *Model) {
 	// at each whirl, 4 cells are moved
-	var r0, c0, r1, c1 int
+	//var r0, c0, r1, c1 int
 	var before, after [2][2]int
-	diffusion_num := model.Parameters.D * model.Parameters.BoardSize / 4
-	for diffusion_i := 0; diffusion_i < diffusion_num; diffusion_i++ {
-		// We get the coordinates for the cell tetrade
-		r0 = rand.Intn(model.Parameters.BoardSize)
-		c0 = rand.Intn(model.Parameters.BoardSize)
-		r1 = myMod(r0, model.Parameters.BoardSize)
-		c1 = myMod(c0, model.Parameters.BoardSize)
+	// We get the coordinates for the cell tetrade
+	r0 := rand.Intn(model.Parameters.BoardSize)
+	c0 := rand.Intn(model.Parameters.BoardSize)
+	r1 := miscow.MyMod(r0+1, model.Parameters.BoardSize)
+	c1 := miscow.MyMod(c0+1, model.Parameters.BoardSize)
 
-		// Save the tetrades
-		before[0][0] = (*model.Board_strain)[r0][c0]
-		before[0][1] = (*model.Board_strain)[r0][c1]
-		before[1][0] = (*model.Board_strain)[r1][c0]
-		before[1][1] = (*model.Board_strain)[r1][c1]
+	// Save the tetrades
+	before[0][0] = (*model.Board_strain)[r0][c0]
+	before[0][1] = (*model.Board_strain)[r0][c1]
+	before[1][0] = (*model.Board_strain)[r1][c0]
+	before[1][1] = (*model.Board_strain)[r1][c1]
 
-		switch rand.Intn(2) {
-		case 0:
-			// 0 is anticlockwise
-			after[0][0] = before[0][1]
-			after[0][1] = before[1][1]
-			after[1][0] = before[0][0]
-			after[1][1] = before[1][0]
-		case 1:
-			// 1 is clockwise
-			after[0][0] = before[1][0]
-			after[0][1] = before[0][0]
-			after[1][0] = before[1][1]
-			after[1][1] = before[0][1]
-		}
-
-		// Assign the rotated cells
-		(*model.Board_strain)[r0][c0] = after[0][0]
-		(*model.Board_strain)[r0][c1] = after[0][1]
-		(*model.Board_strain)[r1][c0] = after[1][0]
-		(*model.Board_strain)[r1][c1] = after[1][1]
-
-		update_arrays(model, r0, c0, after[0][0], before[0][0])
-		update_arrays(model, r0, c1, after[0][1], before[0][1])
-		update_arrays(model, r0, c0, after[1][0], before[1][0])
-		update_arrays(model, r1, c1, after[1][1], before[1][1])
+	switch rand.Intn(2) {
+	case 0:
+		// 0 is anticlockwise
+		after[0][0] = before[0][1]
+		after[0][1] = before[1][1]
+		after[1][0] = before[0][0]
+		after[1][1] = before[1][0]
+	case 1:
+		// 1 is clockwise
+		after[0][0] = before[1][0]
+		after[0][1] = before[0][0]
+		after[1][0] = before[1][1]
+		after[1][1] = before[0][1]
 	}
+
+	//fmt.Println("[r0][c0]", r0, c0)
+	//fmt.Println("[r0][c1]", r0, c1)
+	//fmt.Println("[r1][c0]", r1, c0)
+	//fmt.Println("[r1][c1]", r1, c1)
+	//fmt.Println("before[0][0]", before[0][0])
+	//fmt.Println("before[0][1]", before[0][1])
+	//fmt.Println("before[1][0]", before[1][0])
+	//fmt.Println("before[1][1]", before[1][1])
+	//fmt.Println("after[0][0]", after[0][0])
+	//fmt.Println("after[0][1]", after[0][1])
+	//fmt.Println("after[1][0]", after[1][0])
+	//fmt.Println("after[1][1]", after[1][1])
+	//fmt.Println("(*model.Board_strain)[r0][c0]", (*model.Board_strain)[r0][c0])
+	//fmt.Println("(*model.Board_strain)[r0][c1]", (*model.Board_strain)[r0][c1])
+	//fmt.Println("(*model.Board_strain)[r1][c0]", (*model.Board_strain)[r1][c0])
+	//fmt.Println("(*model.Board_strain)[r1][c1]", (*model.Board_strain)[r1][c1])
+
+	// Assign the rotated cells
+	(*model.Board_strain)[r0][c0] = after[0][0]
+	(*model.Board_strain)[r0][c1] = after[0][1]
+	(*model.Board_strain)[r1][c0] = after[1][0]
+	(*model.Board_strain)[r1][c1] = after[1][1]
+	(func(int, int, int, int, [2][2]int) {})(r0, c0, r1, c1, before)
+
+	//fmt.Println("(*model.Board_strain)[r0][c0]", (*model.Board_strain)[r0][c0])
+	//fmt.Println("(*model.Board_strain)[r0][c1]", (*model.Board_strain)[r0][c1])
+	//fmt.Println("(*model.Board_strain)[r1][c0]", (*model.Board_strain)[r1][c0])
+	//fmt.Println("(*model.Board_strain)[r1][c1]", (*model.Board_strain)[r1][c1])
+
+	update_arrays(model, r0, c0, after[0][0], before[0][0])
+	update_arrays(model, r0, c1, after[0][1], before[0][1])
+	update_arrays(model, r0, c0, after[1][0], before[1][0])
+	update_arrays(model, r1, c1, after[1][1], before[1][1])
+	/*
+	 */
 }
 
 func run(model *Model) {
 	miscow.Trace("strife.go: run()")
 	defer miscow.Trace("strife.go: run()")
-	for ; model.Generation_i < model.Parameters.Generations; model.Generation_i++ {
-		fmt.Println(i)
-		diffuse(model)
+	var diffusion_num int = int(model.Parameters.D * float64(model.Parameters.BoardSize*model.Parameters.BoardSize) / 4)
+	fmt.Println("diffusion_num: ", diffusion_num)
+    fmt.Println("model.Parameters.Generations = ", model.Parameters.Generations)
+    fmt.Println("model.Generation_i = ", model.Generation_i)
+	for model.Generation_i = 0; model.Generation_i < model.Parameters.Generations; model.Generation_i++ {
+        fmt.Println("model.Generation_i = ", model.Generation_i)
+		fmt.Println(model.Generation_i, model.Parameters.Generations)
+		for diffusion_i := 0; diffusion_i < diffusion_num; diffusion_i++ {
+			diffuse(model)
+		}
+		return
 	}
-	return
 }

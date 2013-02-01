@@ -48,7 +48,7 @@ func init_board_signal_num(model *Model) *Board_signal_num {
 		for center_col_i := range (*model.Board_strain)[center_row_i] {
 			for rad_row_i := center_row_i - model.Parameters.SRad; rad_row_i < center_row_i+model.Parameters.SRad+1; rad_row_i++ {
 				for rad_col_i := center_col_i - model.Parameters.SRad; rad_col_i < center_col_i+model.Parameters.SRad+1; rad_col_i++ {
-					current_strain := (*model.Board_strain)[myMod(rad_row_i, model.Parameters.BoardSize)][myMod(rad_col_i, model.Parameters.BoardSize)]
+					current_strain := (*model.Board_strain)[miscow.MyMod(rad_row_i, model.Parameters.BoardSize)][miscow.MyMod(rad_col_i, model.Parameters.BoardSize)]
 					current_signal_strain := s4strain[current_strain]
 					board_signal_num[current_signal_strain][center_row_i][center_col_i] = board_signal_num[current_signal_strain][center_row_i][center_col_i] + 1
 					//fmt.Println(center_row_i, center_col_i, rad_row_i, rad_col_i, current_strain, current_signal_strain, board_signal_num[current_signal_strain][center_row_i][center_col_i])
@@ -95,7 +95,7 @@ func init_board_pg_num(model *Model) *Board_pg_num {
 		for center_col_i := range board_pg_num[center_row_i] {
 			for rad_row_i := center_row_i - model.Parameters.CRad; rad_row_i < center_row_i+model.Parameters.CRad+1; rad_row_i++ {
 				for rad_col_i := center_col_i - model.Parameters.CRad; rad_col_i < center_col_i+model.Parameters.CRad+1; rad_col_i++ {
-					if (*model.Board_prod)[myMod(rad_row_i, model.Parameters.BoardSize)][myMod(rad_col_i, model.Parameters.BoardSize)] >= model.Parameters.CTh {
+					if (*model.Board_prod)[miscow.MyMod(rad_row_i, model.Parameters.BoardSize)][miscow.MyMod(rad_col_i, model.Parameters.BoardSize)] >= model.Parameters.CTh {
 						board_pg_num[center_row_i][center_col_i]++
 					}
 				}
