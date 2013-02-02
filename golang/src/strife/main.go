@@ -18,6 +18,7 @@ func main() {
 	run(model)
 
 	//fmt.Println("Board strain:\n", model.Board_strain)
-	fmt.Println("model.params:\n", model.Parameters)
-	fmt.Println("model.settings:\n", model.Settings)
+	//fmt.Println("model.params:\n", model.Parameters)
+	//fmt.Println("model.settings:\n", model.Settings)
+    fmt.Print()
 }

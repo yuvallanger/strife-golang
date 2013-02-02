@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"miscow"
 )
 
 type Board_strain [][]int       // [rows][columns]. possible values: {0,1,2,3}. s0r0 - 0; s0r1 - 1; s1r0 - 2; s1r1 - 3
 type Board_signal_num [][][]int // [signal types][rows][columns]
-type Board_prod [][]int         // [rows][columns]
+type Board_prod [][]bool        // [rows][columns]
 type Board_pg_num [][]int       // [rows][columns]
 
 type Model struct {
@@ -31,21 +32,26 @@ type Frequencies_T [][]int
 type Neighborhood_Frequencies_T [][][]int
 
 type Parameters_T struct {
-	Generations int
-	RInitOdds   float64
-	SInitOdds   float64
-	STh         int
-	CTh         int
-	SRad        int
-	CRad        int
-	BoardSize   int
-	D           float64
-	MutOddsR    float64
-	MutOddsS    float64
+	Generations                  int
+	R_Init_Odds                  float64
+	S_Init_Odds                  float64
+	Signal_Threshold             int
+	Cooperation_Effect_Threshold int
+	S_Radius                     int
+	PG_Radius                    int
+	Board_Size                   int
+	D                            float64
+	Mut_Odds_R                   float64
+	Mut_Odds_S                   float64
+	Basal_Cost                   float64
+	Cooperation_Cost             float64
+	Signal_Cost                  float64
+	Receptor_Cost                float64
+	Public_Goods_Effect          float64
 }
 
 type Settings_T struct {
-	DataFilename string
+	Data_Filename string
 }
 
 type Config struct {
@@ -53,21 +59,63 @@ type Config struct {
 	Settings   Settings_T
 }
 
+type Coordinate struct {
+	r, c int
+}
+
+func (board *Board_strain) get_cell(c Coordinate) int {
+	return (*board)[c.r][c.c]
+}
+
+func (board *Board_signal_num) get_cell(signal int, c Coordinate) int {
+	return (*board)[signal][c.r][c.c]
+}
+
+func (board *Board_prod) get_cell(c Coordinate) bool {
+	return (*board)[c.r][c.c]
+}
+
+func (board *Board_pg_num) get_cell(c Coordinate) int {
+	return (*board)[c.r][c.c]
+}
+
+func (board *Board_strain) set_cell(c Coordinate, strain int) {
+	(*board)[c.r][c.c] = strain
+}
+
+func (board *Board_signal_num) set_cell(signal_coordinate int, c Coordinate, signal_num int) {
+	(*board)[signal_coordinate][c.r][c.c] = signal_num
+}
+
+func (board *Board_prod) set_cell(c Coordinate, prod bool) {
+	(*board)[c.r][c.c] = prod
+}
+
+func (board *Board_pg_num) set_cell(c Coordinate, pg_num int) {
+	(*board)[c.r][c.c] = pg_num
+}
+
+func rand_coord(board_size int) Coordinate {
+	return Coordinate{
+		r: rand.Intn(board_size),
+		c: rand.Intn(board_size)}
+}
+
 func (board_strain Board_strain) String() (s string) {
 	miscow.Trace("(Board_strain) String()")
 	defer miscow.Untrace("(Board_strain) String()")
 	s = " "
-    for i := range board_strain {
-        s += fmt.Sprintf("%2v", i)
-    }
-    s += "\n"
-    for i0, v0 := range board_strain {
-        s += fmt.Sprintf("%v: ", i0)
-        for _, v1 := range v0 {
-            s += fmt.Sprintf("%v ", v1)
-        }
-        s += fmt.Sprintf("\n")
-    }
+	for i := range board_strain {
+		s += fmt.Sprintf("%2v", i)
+	}
+	s += "\n"
+	for i0, v0 := range board_strain {
+		s += fmt.Sprintf("%v: ", i0)
+		for _, v1 := range v0 {
+			s += fmt.Sprintf("%v ", v1)
+		}
+		s += fmt.Sprintf("\n")
+	}
 	s += "\n"
 	return
 }
@@ -92,31 +140,33 @@ func (board_signal_num Board_signal_num) String() (s string) {
 func (board_prod Board_prod) String() (s string) {
 	miscow.Trace("(Board_prod) String()")
 	defer miscow.Untrace("(Board_prod) String()")
-	for _, gene := range [2]int{1, 2} {
-		s += fmt.Sprintf("gene %v\n", gene)
-		for _, v0 := range board_prod {
-			for _, v1 := range v0 {
-				s += fmt.Sprintf("(g%v ", v1)
-				s += fmt.Sprintf("%v) ", (v1&gene)/gene)
+	for _, row_vals := range board_prod {
+		for _, prod := range row_vals {
+			switch prod {
+			case true:
+				s += fmt.Sprintf("%v", 1)
+			case false:
+				s += fmt.Sprintf("%v", 0)
 			}
-			s += fmt.Sprintf("\n")
 		}
+		s += fmt.Sprintf("\n")
 	}
 	return
 }
 
 func (p Parameters_T) String() (s string) {
-	s += fmt.Sprintf("Generations %v\n", p.Generations)
-	s += fmt.Sprintf("RInitOdds   %v\n", p.RInitOdds)
-	s += fmt.Sprintf("SInitOdds   %v\n", p.SInitOdds)
-	s += fmt.Sprintf("STh         %v\n", p.STh)
-	s += fmt.Sprintf("CTh         %v\n", p.CTh)
-	s += fmt.Sprintf("SRad        %v\n", p.SRad)
-	s += fmt.Sprintf("CRad        %v\n", p.CRad)
-	s += fmt.Sprintf("BoardSize   %v\n", p.BoardSize)
-	s += fmt.Sprintf("D           %v\n", p.D)
-	s += fmt.Sprintf("MutOddsR    %v\n", p.MutOddsR)
-	s += fmt.Sprintf("MutOddsS    %v\n", p.MutOddsS)
+	s += fmt.Sprintln("Parameters:")
+	s += fmt.Sprintf("Generations                %2v\n", p.Generations)
+	s += fmt.Sprintf("RInitOdds                  %2v\n", p.R_Init_Odds)
+	s += fmt.Sprintf("SInitOdds                  %2v\n", p.S_Init_Odds)
+	s += fmt.Sprintf("STh                        %2v\n", p.Signal_Threshold)
+	s += fmt.Sprintf("CooperationEffectThreshold %2v\n", p.Cooperation_Effect_Threshold)
+	s += fmt.Sprintf("SRad                       %2v\n", p.S_Radius)
+	s += fmt.Sprintf("CRad                       %2v\n", p.PG_Radius)
+	s += fmt.Sprintf("BoardSize                  %2v\n", p.Board_Size)
+	s += fmt.Sprintf("D                          %2v\n", p.D)
+	s += fmt.Sprintf("MutOddsR                   %2v\n", p.Mut_Odds_R)
+	s += fmt.Sprintf("MutOddsS                   %2v\n", p.Mut_Odds_S)
 	return
 }
 func (model Model) String() (s string) {
