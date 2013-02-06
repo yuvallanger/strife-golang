@@ -1,6 +1,6 @@
-package main
+package sequential
 
-var Parameters = Parameters_T{
+var Default_Parameters = Parameters{
 	Generations:                  10,
 	R_Init_Odds:                  0,
 	S_Init_Odds:                  0,
@@ -18,5 +18,5 @@ var Parameters = Parameters_T{
 	Receptor_Cost:                1,
 	Public_Goods_Effect:          0.6}
 
-var Settings = Settings_T{
+var Default_Settings = Settings{
 	Data_Filename: "data.dat"}

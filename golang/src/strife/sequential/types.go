@@ -1,4 +1,4 @@
-package main
+package sequential
 
 import (
 	"fmt"
@@ -12,26 +12,41 @@ type Board_prod [][]bool        // [rows][columns]
 type Board_pg_num [][]int       // [rows][columns]
 
 type Model struct {
-	Parameters       Parameters_T
-	Settings         Settings_T
+	Parameters
+	Settings         Settings
 	Board_strain     *Board_strain
 	Board_signal_num *Board_signal_num
 	Board_prod       *Board_prod
 	Board_pg_num     *Board_pg_num
-	DataBoards       struct {
-		Snapshots                *Snapshots_T
-		Frequencies              *Frequencies_T
-		Neighborhood_Frequencies *Neighborhood_Frequencies_T
+	Data_Boards      struct {
+		Snapshots
+		Frequencies
+		Neighborhood_Frequencies
 	}
 	Generation_i int
 	//RandomState      rand.Rand
 }
 
-type Snapshots_T [][][]int
-type Frequencies_T [][]int
-type Neighborhood_Frequencies_T [][][]int
+type Snapshots struct {
+	Sequence []struct {
+		Generation int
+		Data       [][]int
+	}
+}
+type Frequencies struct {
+	Sequence []struct {
+		Generation int
+		Data       []int
+	}
+}
+type Neighborhood_Frequencies struct {
+	Sequence []struct {
+		Generation int
+		Data       [][]int
+	}
+}
 
-type Parameters_T struct {
+type Parameters struct {
 	Generations                  int
 	R_Init_Odds                  float64
 	S_Init_Odds                  float64
@@ -50,13 +65,16 @@ type Parameters_T struct {
 	Public_Goods_Effect          float64
 }
 
-type Settings_T struct {
-	Data_Filename string
+type Settings struct {
+	Data_Filename                string
+	Snapshots_num                int
+	Frequencies_num              int
+	Neighborhood_Frequencies_num int
 }
 
 type Config struct {
-	Parameters Parameters_T
-	Settings   Settings_T
+	Parameters
+	Settings
 }
 
 type Coordinate struct {
@@ -154,7 +172,7 @@ func (board_prod Board_prod) String() (s string) {
 	return
 }
 
-func (p Parameters_T) String() (s string) {
+func (p Parameters) String() (s string) {
 	s += fmt.Sprintln("Parameters:")
 	s += fmt.Sprintf("Generations                %2v\n", p.Generations)
 	s += fmt.Sprintf("RInitOdds                  %2v\n", p.R_Init_Odds)
@@ -169,10 +187,53 @@ func (p Parameters_T) String() (s string) {
 	s += fmt.Sprintf("MutOddsS                   %2v\n", p.Mut_Odds_S)
 	return
 }
-func (model Model) String() (s string) {
+func (model *Model) String() (s string) {
 	miscow.Trace("(Model) String()")
 	defer miscow.Untrace("(Model) String()")
 	s += fmt.Sprintf("model.params:\n%v\n", model.Parameters)
 	s += fmt.Sprintf("%v\n", *model.Board_strain)
 	return
+}
+
+type Simulation interface {
+	GetCellStrain(c Coordinate) int
+	GetCellProd(c Coordinate) bool
+	GetCellSignalNum(c Coordinate) int
+	GetCellPGNum(c Coordinate) bool
+	SetCellStrain(c Coordinate, val int)
+	SetCellProd(c Coordinate, val bool)
+	SetCellSignalNum(c Coordinate, val int)
+	SetCellPGNum(c Coordinate, val bool)
+}
+
+func (model *Model) GetCellStrain(c Coordinate) int {
+	return (*model.Board_strain)[c.r][c.c]
+}
+
+func (model *Model) GetCellProd(c Coordinate) bool {
+	return (*model.Board_prod)[c.r][c.c]
+}
+
+func (model *Model) GetCellSignalNum(signal_type int, c Coordinate) int {
+	return (*model.Board_signal_num)[signal_type][c.r][c.c]
+}
+
+func (model *Model) GetCellPGNum(c Coordinate) int {
+	return (*model.Board_pg_num)[c.r][c.c]
+}
+
+func (model *Model) SetCellStrain(c Coordinate, val int) {
+	(*model.Board_strain)[c.r][c.c] = val
+}
+
+func (model *Model) SetCellProd(c Coordinate, val bool) {
+	(*model.Board_prod)[c.r][c.c] = val
+}
+
+func (model *Model) SetCellSignalNum(signal_type int, c Coordinate, val int) {
+	(*model.Board_signal_num)[signal_type][c.r][c.c] = val
+}
+
+func (model *Model) SetCellPGNum(c Coordinate, val int) {
+	(*model.Board_pg_num)[c.r][c.c] = val
 }
