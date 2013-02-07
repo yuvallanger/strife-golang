@@ -2,7 +2,7 @@ package sequential
 
 import (
 	"fmt"
-	"github.com/yuvallanger/game-of-strife/golang/src/miscow"
+	"miscow"
 	"math/rand"
 	"time"
 )

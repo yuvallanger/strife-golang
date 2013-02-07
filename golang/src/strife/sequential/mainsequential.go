@@ -4,7 +4,7 @@ import (
 	"code.google.com/p/gcfg"
 	"encoding/json"
 	"fmt"
-	"github.com/yuvallanger/game-of-strife/golang/src/miscow"
+	"miscow"
 	"io/ioutil"
 )
 

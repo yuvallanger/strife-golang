@@ -3,7 +3,7 @@ package concurrent
 import (
 	"fmt"
 	"math/rand"
-	"github.com/yuvallanger/game-of-strife/golang/src/miscow"
+	"miscow"
 	"runtime"
 	"time"
 )

@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	c "github.com/yuvallanger/game-of-strife/golang/src/strife/concurrent"
-	s "github.com/yuvallanger/game-of-strife/golang/src/strife/sequential"
+	"strife/concurrent"
+	"strife/sequential"
 )
 
 func main() {
@@ -11,8 +11,8 @@ func main() {
 	flag.Parse()
 	switch *modeltype {
 	case "sequential":
-		s.Main()
+		sequential.Main()
 	case "concurrent":
-		c.Main()
+		concurrent.Main()
 	}
 }

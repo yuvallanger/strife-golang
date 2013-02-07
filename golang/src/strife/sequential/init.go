@@ -1,8 +1,8 @@
 package sequential
 
 import (
-	"github.com/yuvallanger/game-of-strife/golang/src/miscow"
 	"math/rand"
+	"miscow"
 )
 
 func init_board_strain(model *Model) *Board_strain {
