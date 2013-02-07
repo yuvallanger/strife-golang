@@ -4,12 +4,12 @@ import (
 	"code.google.com/p/gcfg"
 	"encoding/json"
 	"fmt"
+	"github.com/yuvallanger/game-of-strife/golang/src/miscow"
 	"io/ioutil"
-	"miscow"
 )
 
 func load_config() (parameters Parameters, settings Settings) {
-    miscow.Trace("load_config")
+	miscow.Trace("load_config")
 	defer miscow.Untrace("load_config")
 	var cfg Config
 	err := gcfg.ReadFileInto(&cfg, "strife.conf")
@@ -25,8 +25,8 @@ func load_config() (parameters Parameters, settings Settings) {
 }
 
 func get_sample_rate(m *Model, n int) (sample_rate int) {
-    miscow.Trace("get_sample_rate")
-    defer miscow.Untrace("get_sample_rate")
+	miscow.Trace("get_sample_rate")
+	defer miscow.Untrace("get_sample_rate")
 	if n == 0 {
 		sample_rate = 0
 	} else {
@@ -36,8 +36,8 @@ func get_sample_rate(m *Model, n int) (sample_rate int) {
 }
 
 func init_databoards(model *Model) {
-    miscow.Trace("init_databoards")
-    defer miscow.Untrace("init_databoards")
+	miscow.Trace("init_databoards")
+	defer miscow.Untrace("init_databoards")
 	sample_rate := get_sample_rate(model, model.Settings.Snapshots_num)
 	if sample_rate != 0 {
 		model.Data_Boards.Snapshots.Sequence = make([]struct {
@@ -59,8 +59,8 @@ func init_databoards(model *Model) {
 }
 
 func Main() {
-    miscow.Trace("Main")
-    defer miscow.Untrace("Main")
+	miscow.Trace("Main")
+	defer miscow.Untrace("Main")
 	// Reading configuration file
 	model := new(Model)
 	params, settings := load_config()

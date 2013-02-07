@@ -2,8 +2,8 @@ package sequential
 
 import (
 	"fmt"
+	"github.com/yuvallanger/game-of-strife/golang/src/miscow"
 	"math/rand"
-	"miscow"
 )
 
 type Board_strain [][]int       // [rows][columns]. possible values: {0,1,2,3}. s0r0 - 0; s0r1 - 1; s1r0 - 2; s1r1 - 3

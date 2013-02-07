@@ -2,8 +2,8 @@ package sequential
 
 import (
 	"fmt"
+	"github.com/yuvallanger/game-of-strife/golang/src/miscow"
 	"math/rand"
-	"miscow"
 	"time"
 )
 
@@ -11,14 +11,14 @@ var s4strain = []int{0, 0, 1, 1}
 var r4strain = []int{0, 1, 0, 1}
 
 func strain_spec(r, s int) int {
-    miscow.Trace("strain_spec")
-    defer miscow.Untrace("strain_spec")
+	miscow.Trace("strain_spec")
+	defer miscow.Untrace("strain_spec")
 	return r + s*2
 }
 
 func fitness(model *Model, coord Coordinate) float64 {
-    miscow.Trace("fitness")
-    defer miscow.Untrace("fitness")
+	miscow.Trace("fitness")
+	defer miscow.Untrace("fitness")
 	// computes the fitness of a given cell
 	var cost float64 = model.Parameters.Basal_Cost
 
@@ -35,8 +35,8 @@ func fitness(model *Model, coord Coordinate) float64 {
 }
 
 func mutate(model *Model, coord Coordinate) int {
-    miscow.Trace("mutate")
-    defer miscow.Untrace("mutate")
+	miscow.Trace("mutate")
+	defer miscow.Untrace("mutate")
 	var r, s int
 	var strain int = model.Board_strain.get_cell(coord)
 
@@ -54,8 +54,8 @@ func mutate(model *Model, coord Coordinate) int {
 }
 
 func update_arrays(model *Model, coord Coordinate, newstrain, oldstrain int) {
-    miscow.Trace("update_arrays")
-    defer miscow.Untrace("update_arrays")
+	miscow.Trace("update_arrays")
+	defer miscow.Untrace("update_arrays")
 	var (
 		s_row_i, s_col_i, s_row_i_t, s_col_i_t           int
 		pg_row_i, pg_col_i, pg_row_i_t, pg_col_i_t       int
@@ -110,8 +110,8 @@ func update_arrays(model *Model, coord Coordinate, newstrain, oldstrain int) {
 }
 
 func endgame(model *Model, winner, loser Coordinate) {
-    miscow.Trace("endgame")
-    defer miscow.Untrace("endgame")
+	miscow.Trace("endgame")
+	defer miscow.Untrace("endgame")
 	/*
 	   wr - winner's row
 	   wc - winner's column
@@ -127,8 +127,8 @@ func endgame(model *Model, winner, loser Coordinate) {
 }
 
 func rand_neighbor(coord Coordinate, board_size int) (coord2 Coordinate) {
-    miscow.Trace("rand_neighbor")
-    defer miscow.Untrace("rand_neighbor")
+	miscow.Trace("rand_neighbor")
+	defer miscow.Untrace("rand_neighbor")
 	switch direction := rand.Intn(4); direction {
 	case 0:
 		coord2.r = coord.r
@@ -147,8 +147,8 @@ func rand_neighbor(coord Coordinate, board_size int) (coord2 Coordinate) {
 }
 
 func competition(model *Model) {
-    miscow.Trace("competition")
-    defer miscow.Untrace("competition")
+	miscow.Trace("competition")
+	defer miscow.Untrace("competition")
 	var c1, c2 Coordinate
 	c1 = rand_coord(model.Parameters.Board_Size)
 	c2 = rand_neighbor(c1, model.Parameters.Board_Size)
@@ -169,8 +169,8 @@ func competition(model *Model) {
 }
 
 func diffuse(model *Model) {
-    miscow.Trace("diffuse")
-    defer miscow.Untrace("diffuse")
+	miscow.Trace("diffuse")
+	defer miscow.Untrace("diffuse")
 	// at each whirl, 4 cells are moved
 	//var r0, c0, r1, c1 int
 	var before, after [2][2]int
@@ -237,8 +237,8 @@ func diffuse(model *Model) {
 }
 
 func showtiming(t_start time.Time, dt_iter time.Duration) {
-    miscow.Trace("showtiming")
-    defer miscow.Untrace("showtiming")
+	miscow.Trace("showtiming")
+	defer miscow.Untrace("showtiming")
 	t_elapsed := time.Now().Sub(t_start)
 	dt_tot_runtime := time.Duration(dt_iter.Nanoseconds()*10000) * time.Nanosecond
 	t_finish := t_start.Add(dt_tot_runtime)

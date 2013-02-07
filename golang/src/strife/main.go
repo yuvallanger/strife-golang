@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	c "strife/concurrent"
-	s "strife/sequential"
+	c "github.com/yuvallanger/game-of-strife/golang/src/strife/concurrent"
+	s "github.com/yuvallanger/game-of-strife/golang/src/strife/sequential"
 )
 
 func main() {
