@@ -12,7 +12,7 @@ type Board_prod [][]bool        // [rows][columns]
 type Board_pg_num [][]int       // [rows][columns]
 
 type Model struct {
-	Parameters
+	Parameters       Parameters
 	Settings         Settings
 	Board_strain     *Board_strain
 	Board_signal_num *Board_signal_num
