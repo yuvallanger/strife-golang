@@ -2,31 +2,27 @@ package sequential
 
 import (
 	"fmt"
-	"miscow"
 	"math/rand"
+	"miscow"
 	"time"
 )
 
-var s4strain = []int{0, 0, 1, 1}
-var r4strain = []int{0, 1, 0, 1}
+var s4strain = [4]int{0, 0, 1, 1} // index is the strain. value is the signal allele.
+var r4strain = [4]int{0, 1, 0, 1} // index is the strain. value is the receptor allele.
 
 func strain_spec(r, s int) int {
-	miscow.Trace("strain_spec")
-	defer miscow.Untrace("strain_spec")
 	return r + s*2
 }
 
 func fitness(model *Model, coord Coordinate) float64 {
-	miscow.Trace("fitness")
-	defer miscow.Untrace("fitness")
 	// computes the fitness of a given cell
 	var cost float64 = model.Parameters.Basal_Cost
 
-	if model.Board_prod.get_cell(coord) == true {
+	if model.Get_Cell_Prod(coord) {
 		cost += model.Parameters.Cooperation_Cost
 	}
 
-	if model.Parameters.Cooperation_Effect_Threshold <= model.Board_pg_num.get_cell(coord) {
+	if model.Parameters.Cooperation_Effect_Threshold <= model.Get_Cell_PG_Num(coord) {
 		cost *= model.Parameters.Public_Goods_Effect
 	}
 
@@ -35,10 +31,8 @@ func fitness(model *Model, coord Coordinate) float64 {
 }
 
 func mutate(model *Model, coord Coordinate) int {
-	miscow.Trace("mutate")
-	defer miscow.Untrace("mutate")
 	var r, s int
-	var strain int = model.Board_strain.get_cell(coord)
+	var strain int = model.Get_Cell_Strain(coord)
 
 	r = r4strain[strain]
 	if rand.Float64() < model.Parameters.Mut_Odds_R {
@@ -54,53 +48,39 @@ func mutate(model *Model, coord Coordinate) int {
 }
 
 func update_arrays(model *Model, coord Coordinate, newstrain, oldstrain int) {
-	miscow.Trace("update_arrays")
-	defer miscow.Untrace("update_arrays")
 	var (
-		s_row_i, s_col_i, s_row_i_t, s_col_i_t           int
-		pg_row_i, pg_col_i, pg_row_i_t, pg_col_i_t       int
-		s_rad, pg_rad, s_th, board_size, neighbor_strain int
+		neighbor_strain          int
+		signal_i, signal_i_torus Coordinate
+		pg_i, pg_i_torus         Coordinate
+		oldprod                  bool
 	)
-	var oldprod bool
-	(func(int, int, int, int, int, int, int, int, int, int, int, int, int, bool) {})(
-		s_row_i, s_col_i, s_row_i_t, s_col_i_t,
-		pg_row_i, pg_col_i, pg_row_i_t, pg_col_i_t,
-		s_rad, pg_rad, s_th, board_size,
-		neighbor_strain,
-		oldprod)
-	s_rad = model.Parameters.S_Radius
-	pg_rad = model.Parameters.PG_Radius
-	s_th = model.Parameters.Signal_Threshold
-	board_size = model.Parameters.Board_Size
-	// TODO convert s_rad, c_rad, s_th, board_size back to model.Parameters...
 
-	for s_row_i = coord.r - s_rad; s_row_i <= coord.r+s_rad; s_row_i++ {
-		for s_col_i = coord.c - s_rad; s_col_i <= coord.c+s_rad; s_col_i++ {
-			s_row_i_t = miscow.MyMod(s_row_i, board_size)
-			s_col_i_t = miscow.MyMod(s_col_i, board_size)
+	for signal_i.r = coord.r - model.Parameters.S_Radius; signal_i.r <= coord.r+model.Parameters.S_Radius; signal_i.r++ {
+		for signal_i.c = coord.c - model.Parameters.S_Radius; signal_i.c <= coord.c+model.Parameters.S_Radius; signal_i.c++ {
+			// Get the toroid coordinates 
+			signal_i_torus = signal_i.Get_Toroid_Coordinates(model.Parameters.Board_Size)
 			// update signal level in sig range
-			(*model.Board_signal_num)[s4strain[oldstrain]][s_row_i_t][s_col_i_t]--
-			(*model.Board_signal_num)[s4strain[newstrain]][s_row_i_t][s_col_i_t]++
+			model.Add_To_Cell_Signal_Num(signal_i_torus, s4strain[oldstrain], -1)
+			model.Add_To_Cell_Signal_Num(signal_i_torus, s4strain[newstrain], 1)
 			// update producer status in sig range
-			oldprod = model.GetCellProd(Coordinate{s_row_i_t, s_col_i_t})
-			neighbor_strain = model.GetCellStrain(Coordinate{s_row_i_t, s_col_i_t})
-			if s_th <= model.GetCellSignalNum(r4strain[neighbor_strain], Coordinate{s_row_i_t, s_col_i_t}) {
-				model.SetCellProd(Coordinate{s_row_i_t, s_col_i_t}, true)
+			oldprod = model.Get_Cell_Prod(signal_i_torus)
+			neighbor_strain = model.Get_Cell_Strain(signal_i_torus)
+			if model.Parameters.Signal_Threshold <= model.Get_Cell_Signal_Num(signal_i_torus, r4strain[neighbor_strain]) {
+				model.Set_Cell_Prod(signal_i_torus, true)
 			} else {
-				model.SetCellProd(Coordinate{s_row_i_t, s_col_i_t}, false)
+				model.Set_Cell_Prod(signal_i_torus, false)
 			}
 			// update pg level in sig+pg range
-			if oldprod != (*model.Board_prod)[s_row_i_t][s_col_i_t] {
-				for pg_row_i = s_row_i_t - pg_rad; pg_row_i <= s_row_i_t+pg_rad; pg_row_i++ {
-					for pg_col_i = s_col_i_t - pg_rad; pg_col_i <= s_col_i_t+pg_rad; pg_col_i++ {
-						pg_row_i_t = (pg_row_i + board_size) % board_size
-						pg_col_i_t = (pg_col_i + board_size) % board_size
-						switch (*model.Board_prod)[s_row_i_t][s_col_i_t] {
+			if oldprod != model.Get_Cell_Prod(signal_i_torus) {
+				for pg_i.r = signal_i.r - model.Parameters.PG_Radius; pg_i.r <= signal_i.r+model.Parameters.PG_Radius; pg_i.r++ {
+					for pg_i.c = signal_i.c - model.Parameters.PG_Radius; pg_i.c <= signal_i.c+model.Parameters.PG_Radius; pg_i.c++ {
+						pg_i_torus = Coordinate{r: (pg_i.r + model.Parameters.Board_Size) % model.Parameters.Board_Size,
+							c: (pg_i.c + model.Parameters.Board_Size) % model.Parameters.Board_Size}
+						switch model.Get_Cell_Prod(signal_i_torus) {
 						case true:
-							(*model.Board_pg_num)[pg_row_i_t][pg_col_i_t] += 1
+							model.Add_To_Cell_PG_Num(pg_i_torus, 1)
 						default:
-							(*model.Board_pg_num)[pg_row_i_t][pg_col_i_t] -= 1
-
+							model.Add_To_Cell_PG_Num(pg_i_torus, -1)
 						}
 					}
 				}
@@ -109,26 +89,22 @@ func update_arrays(model *Model, coord Coordinate, newstrain, oldstrain int) {
 	}
 }
 
-func endgame(model *Model, winner, loser Coordinate) {
-	miscow.Trace("endgame")
-	defer miscow.Untrace("endgame")
+func endgame(model *Model, winner_coord, loser_coord Coordinate) {
 	/*
-	   wr - winner's row
-	   wc - winner's column
-	   lr - loser's row
-	   lc - loser's column
+	   wr - winner_coord's row
+	   wc - winner_coord's column
+	   lr - loser_coord's row
+	   lc - loser_coord's column
 	*/
-	newstrain := mutate(model, winner)
-	if newstrain != model.Board_strain.get_cell(loser) {
-		oldstrain := model.Board_strain.get_cell(loser)
-		(model.Board_strain).set_cell(loser, newstrain)
-		update_arrays(model, loser, newstrain, oldstrain)
+	newstrain := mutate(model, winner_coord)
+	if newstrain != model.Get_Cell_Strain(loser_coord) {
+		oldstrain := model.Get_Cell_Strain(loser_coord)
+		model.Set_Cell_Strain(loser_coord, newstrain)
+		update_arrays(model, loser_coord, newstrain, oldstrain)
 	}
 }
 
 func rand_neighbor(coord Coordinate, board_size int) (coord2 Coordinate) {
-	miscow.Trace("rand_neighbor")
-	defer miscow.Untrace("rand_neighbor")
 	switch direction := rand.Intn(4); direction {
 	case 0:
 		coord2.r = coord.r
@@ -147,8 +123,6 @@ func rand_neighbor(coord Coordinate, board_size int) (coord2 Coordinate) {
 }
 
 func competition(model *Model) {
-	miscow.Trace("competition")
-	defer miscow.Untrace("competition")
 	var c1, c2 Coordinate
 	c1 = rand_coord(model.Parameters.Board_Size)
 	c2 = rand_neighbor(c1, model.Parameters.Board_Size)
@@ -168,37 +142,40 @@ func competition(model *Model) {
 	}
 }
 
-func diffuse(model *Model) {
-	miscow.Trace("diffuse")
-	defer miscow.Untrace("diffuse")
+/*
+Takes a model and turns four cells 90 degrees
+*/
+func diffuse(model *Model, coord00 Coordinate, direction bool) {
 	// at each whirl, 4 cells are moved
 	//var r0, c0, r1, c1 int
 	var before, after [2][2]int
-	// We get the coordinates for the cell tetrade
-	r0 := rand.Intn(model.Parameters.Board_Size)
-	c0 := rand.Intn(model.Parameters.Board_Size)
-	r1 := miscow.MyMod(r0+1, model.Parameters.Board_Size)
-	c1 := miscow.MyMod(c0+1, model.Parameters.Board_Size)
+
+	// We get the coordinates for the four cells we'll turn.'
+	coord11 := Coordinate{r: miscow.MyMod(coord00.r+1, model.Parameters.Board_Size),
+		c: miscow.MyMod(coord00.c+1, model.Parameters.Board_Size)}
+	coord01 := coord00
+	coord01.c = coord11.c
+	coord10 := coord00
+	coord10.c = coord11.r
 
 	// Save the tetrades
-	before[0][0] = (*model.Board_strain)[r0][c0]
-	before[0][1] = (*model.Board_strain)[r0][c1]
-	before[1][0] = (*model.Board_strain)[r1][c0]
-	before[1][1] = (*model.Board_strain)[r1][c1]
+	before[0][0] = model.Get_Cell_Strain(coord00)
+	before[0][1] = model.Get_Cell_Strain(coord01)
+	before[1][0] = model.Get_Cell_Strain(coord10)
+	before[1][1] = model.Get_Cell_Strain(coord11)
 
-	switch rand.Intn(2) {
-	case 0:
-		// 0 is anticlockwise
-		after[0][0] = before[0][1]
-		after[0][1] = before[1][1]
-		after[1][0] = before[0][0]
-		after[1][1] = before[1][0]
-	case 1:
-		// 1 is clockwise
+	if direction {
+		// true is clockwise
 		after[0][0] = before[1][0]
 		after[0][1] = before[0][0]
 		after[1][0] = before[1][1]
 		after[1][1] = before[0][1]
+	} else {
+		// false is anticlockwise
+		after[0][0] = before[0][1]
+		after[0][1] = before[1][1]
+		after[1][0] = before[0][0]
+		after[1][1] = before[1][0]
 	}
 
 	//fmt.Println("[r0][c0]", r0, c0)
@@ -219,26 +196,23 @@ func diffuse(model *Model) {
 	//fmt.Println("(*model.Board_strain)[r1][c1]", (*model.Board_strain)[r1][c1])
 
 	// Assign the rotated cells
-	(*model.Board_strain)[r0][c0] = after[0][0]
-	(*model.Board_strain)[r0][c1] = after[0][1]
-	(*model.Board_strain)[r1][c0] = after[1][0]
-	(*model.Board_strain)[r1][c1] = after[1][1]
+	model.Set_Cell_Strain(coord00, after[0][0])
+	model.Set_Cell_Strain(coord01, after[0][1])
+	model.Set_Cell_Strain(coord10, after[1][0])
+	model.Set_Cell_Strain(coord11, after[1][1])
 
-	(func(int, int, int, int, [2][2]int, [2][2]int) {})(r0, c0, r1, c1, before, after)
 	//fmt.Println("(*model.Board_strain)[r0][c0]", (*model.Board_strain)[r0][c0])
 	//fmt.Println("(*model.Board_strain)[r0][c1]", (*model.Board_strain)[r0][c1])
 	//fmt.Println("(*model.Board_strain)[r1][c0]", (*model.Board_strain)[r1][c0])
 	//fmt.Println("(*model.Board_strain)[r1][c1]", (*model.Board_strain)[r1][c1])
 
-	update_arrays(model, Coordinate{r: r0, c: c0}, after[0][0], before[0][0])
-	update_arrays(model, Coordinate{r: r0, c: c1}, after[0][1], before[0][1])
-	update_arrays(model, Coordinate{r: r0, c: c0}, after[1][0], before[1][0])
-	update_arrays(model, Coordinate{r: r1, c: c1}, after[1][1], before[1][1])
+	update_arrays(model, coord00, after[0][0], before[0][0])
+	update_arrays(model, coord01, after[0][1], before[0][1])
+	update_arrays(model, coord10, after[1][0], before[1][0])
+	update_arrays(model, coord11, after[1][1], before[1][1])
 }
 
 func showtiming(t_start time.Time, dt_iter time.Duration) {
-	miscow.Trace("showtiming")
-	defer miscow.Untrace("showtiming")
 	t_elapsed := time.Now().Sub(t_start)
 	dt_tot_runtime := time.Duration(dt_iter.Nanoseconds()*10000) * time.Nanosecond
 	t_finish := t_start.Add(dt_tot_runtime)
@@ -246,43 +220,4 @@ func showtiming(t_start time.Time, dt_iter time.Duration) {
 	fmt.Println("Since start:", t_elapsed)
 	fmt.Println("Expected total run time:", dt_tot_runtime)
 	fmt.Println("Finish time:", t_finish)
-}
-
-func run(model *Model) {
-	miscow.Trace("strife.go: run()")
-	defer miscow.Untrace("strife.go: run()")
-	var competition_i, diffusion_i int
-	var t_iter_start time.Time
-	var diffusion_num int = int(model.Parameters.D * float64(model.Parameters.Board_Size*model.Parameters.Board_Size) / 4)
-	fmt.Println("diffusion_num: ", diffusion_num)
-	fmt.Println("model.Parameters.Generations = ", model.Parameters.Generations)
-	fmt.Println("model.Generation_i = ", model.Generation_i)
-	tstart := time.Now()
-	for model.Generation_i = 0; model.Generation_i < model.Parameters.Generations; model.Generation_i++ {
-		// TODO
-		/*
-			if model.Generation_i%100 == 0 {
-				     model.Data_Boards.Snapshots[model.Generation_i / 10] = struct {Data: model.Strain , Generation: model.Generation_i}
-			}
-		*/
-		t_iter_start = time.Now()
-
-		board_size := model.Parameters.Board_Size
-		fmt.Println("model.Generation_i = ", model.Generation_i)
-		for competition_i = 0; competition_i < board_size*board_size; competition_i++ {
-			competition(model)
-		}
-		for diffusion_i = 0; diffusion_i < diffusion_num; diffusion_i++ {
-			diffuse(model)
-		}
-
-		showtiming(tstart, time.Since(t_iter_start))
-
-		//func (t Time) Add(d Duration) Time
-		//func Since(t Time) Duration
-		//func (t Time) Sub(u Time) Duration
-
-		fmt.Println()
-	}
-	return
 }

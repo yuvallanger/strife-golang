@@ -2,8 +2,8 @@ package sequential
 
 import (
 	"fmt"
-	"miscow"
 	"math/rand"
+	"miscow"
 )
 
 type Board_strain [][]int       // [rows][columns]. possible values: {0,1,2,3}. s0r0 - 0; s0r1 - 1; s1r0 - 2; s1r1 - 3
@@ -14,73 +14,90 @@ type Board_pg_num [][]int       // [rows][columns]
 type Model struct {
 	Parameters       Parameters
 	Settings         Settings
-	Board_strain     *Board_strain
-	Board_signal_num *Board_signal_num
-	Board_prod       *Board_prod
-	Board_pg_num     *Board_pg_num
+	Board_strain     Board_strain
+	Board_signal_num Board_signal_num
+	Board_prod       Board_prod
+	Board_pg_num     Board_pg_num
 	Data_Boards      struct {
-		Snapshots
-		Frequencies
-		Neighborhood_Frequencies
+		Snapshots             []Snapshot
+		Frequencies           []Frequency
+		Neighbors_Frequencies []Neighbors_Frequency
 	}
 	Generation_i int
 	//RandomState      rand.Rand
+	Start_Time string // start time in unix nanoseconds
 }
 
-type Snapshots struct {
-	Sequence []struct {
-		Generation int
-		Data       [][]int
-	}
+type Snapshot struct {
+	Generation int
+	Data       [][]int
 }
+
+type Snapshots []Snapshot
+
+type Frequency struct {
+	Generation int
+	Data       []int
+}
+
 type Frequencies struct {
-	Sequence []struct {
-		Generation int
-		Data       []int
-	}
+	Frequency []Frequency
 }
-type Neighborhood_Frequencies struct {
-	Sequence []struct {
-		Generation int
-		Data       [][]int
-	}
+
+type Neighbors_Frequency struct {
+	Generation int
+	Data       [][]int
+}
+
+type Neighbors_Frequencies struct {
+	Neighbors_Frequency []Neighbors_Frequency
 }
 
 type Parameters struct {
-	Generations                  int
-	R_Init_Odds                  float64
-	S_Init_Odds                  float64
-	Signal_Threshold             int
-	Cooperation_Effect_Threshold int
-	S_Radius                     int
-	PG_Radius                    int
-	Board_Size                   int
-	D                            float64
-	Mut_Odds_R                   float64
-	Mut_Odds_S                   float64
-	Basal_Cost                   float64
-	Cooperation_Cost             float64
-	Signal_Cost                  float64
-	Receptor_Cost                float64
-	Public_Goods_Effect          float64
+	Generations                  int     // TODO
+	R_Init_Odds                  float64 // TODO
+	S_Init_Odds                  float64 // TODO
+	Signal_Threshold             int     // TODO
+	Cooperation_Effect_Threshold int     // TODO
+	S_Radius                     int     // the moor radius of signal production
+	PG_Radius                    int     // the moor radius of public goods production
+	Board_Size                   int     // a board will be sized Board_Size^2
+	D                            float64 // diffusion coefficient
+	Mut_Odds_R                   float64 // TODO
+	Mut_Odds_S                   float64 // TODO
+	Basal_Cost                   float64 // TODO
+	Cooperation_Cost             float64 // TODO
+	Signal_Cost                  float64 // TODO
+	Receptor_Cost                float64 // TODO
+	Public_Goods_Effect          float64 // TODO
 }
 
 type Settings struct {
-	Data_Filename                string
-	Snapshots_num                int
-	Frequencies_num              int
-	Neighborhood_Frequencies_num int
+	Data_Filename                string // TODO
+	Snapshots_num                int    // TODO
+	Frequencies_num              int    // TODO
+	Neighborhood_Frequencies_num int    // TODO
 }
 
 type Config struct {
-	Parameters
-	Settings
+	Parameters Parameters // TODO
+	Settings   Settings   // TODO
 }
 
 type Coordinate struct {
-	r, c int
+	r, c int // TODO
 }
 
+/*
+Returns the same coordinates in modulus the size of the board.
+Board is a square, not a rectangle, so we need only one size argument.
+*/
+func (c *Coordinate) Get_Toroid_Coordinates(board_size int) Coordinate {
+	return Coordinate{r: miscow.MyMod(c.r, board_size),
+		c: miscow.MyMod(c.c, board_size)}
+}
+
+/*
 func (board *Board_strain) get_cell(c Coordinate) int {
 	return (*board)[c.r][c.c]
 }
@@ -109,10 +126,11 @@ func (board *Board_prod) set_cell(c Coordinate, prod bool) {
 	(*board)[c.r][c.c] = prod
 }
 
+// TODO remove all "func (board *Board_foo) .." functions an replace with "func (model *Model) .."
 func (board *Board_pg_num) set_cell(c Coordinate, pg_num int) {
 	(*board)[c.r][c.c] = pg_num
 }
-
+*/
 func rand_coord(board_size int) Coordinate {
 	return Coordinate{
 		r: rand.Intn(board_size),
@@ -139,8 +157,6 @@ func (board_strain Board_strain) String() (s string) {
 }
 
 func (board_signal_num Board_signal_num) String() (s string) {
-	miscow.Trace("(Board_signal_num) String()")
-	defer miscow.Untrace("(Board_signal_num) String()")
 	for i0, v0 := range board_signal_num {
 		s += fmt.Sprintf("strain: %2v\n", i0)
 		for i1, v1 := range v0 {
@@ -156,8 +172,6 @@ func (board_signal_num Board_signal_num) String() (s string) {
 }
 
 func (board_prod Board_prod) String() (s string) {
-	miscow.Trace("(Board_prod) String()")
-	defer miscow.Untrace("(Board_prod) String()")
 	for _, row_vals := range board_prod {
 		for _, prod := range row_vals {
 			switch prod {
@@ -191,7 +205,7 @@ func (model *Model) String() (s string) {
 	miscow.Trace("(Model) String()")
 	defer miscow.Untrace("(Model) String()")
 	s += fmt.Sprintf("model.params:\n%v\n", model.Parameters)
-	s += fmt.Sprintf("%v\n", *model.Board_strain)
+	s += fmt.Sprintf("%v\n", model.Board_strain)
 	return
 }
 
@@ -206,34 +220,42 @@ type Simulation interface {
 	SetCellPGNum(c Coordinate, val bool)
 }
 
-func (model *Model) GetCellStrain(c Coordinate) int {
-	return (*model.Board_strain)[c.r][c.c]
+func (model *Model) Get_Cell_Strain(c Coordinate) int {
+	return (model.Board_strain)[c.r][c.c]
 }
 
-func (model *Model) GetCellProd(c Coordinate) bool {
-	return (*model.Board_prod)[c.r][c.c]
+func (model *Model) Get_Cell_Prod(c Coordinate) bool {
+	return (model.Board_prod)[c.r][c.c]
 }
 
-func (model *Model) GetCellSignalNum(signal_type int, c Coordinate) int {
-	return (*model.Board_signal_num)[signal_type][c.r][c.c]
+func (model *Model) Get_Cell_Signal_Num(c Coordinate, signal_type int) int {
+	return (model.Board_signal_num)[signal_type][c.r][c.c]
 }
 
-func (model *Model) GetCellPGNum(c Coordinate) int {
-	return (*model.Board_pg_num)[c.r][c.c]
+func (model *Model) Get_Cell_PG_Num(c Coordinate) int {
+	return (model.Board_pg_num)[c.r][c.c]
 }
 
-func (model *Model) SetCellStrain(c Coordinate, val int) {
-	(*model.Board_strain)[c.r][c.c] = val
+func (model *Model) Set_Cell_Strain(c Coordinate, val int) {
+	(model.Board_strain)[c.r][c.c] = val
 }
 
-func (model *Model) SetCellProd(c Coordinate, val bool) {
-	(*model.Board_prod)[c.r][c.c] = val
+func (model *Model) Set_Cell_Prod(c Coordinate, val bool) {
+	(model.Board_prod)[c.r][c.c] = val
 }
 
-func (model *Model) SetCellSignalNum(signal_type int, c Coordinate, val int) {
-	(*model.Board_signal_num)[signal_type][c.r][c.c] = val
+func (model *Model) Set_Cell_Signal_Num(signal_type int, c Coordinate, val int) {
+	(model.Board_signal_num)[signal_type][c.r][c.c] = val
 }
 
-func (model *Model) SetCellPGNum(c Coordinate, val int) {
-	(*model.Board_pg_num)[c.r][c.c] = val
+func (model *Model) Set_Cell_PG_Num(c Coordinate, val int) {
+	(model.Board_pg_num)[c.r][c.c] = val
+}
+
+func (model *Model) Add_To_Cell_PG_Num(c Coordinate, val int) {
+	(model.Board_pg_num)[c.r][c.c] += val
+}
+
+func (model *Model) Add_To_Cell_Signal_Num(c Coordinate, signal_type, val int) {
+	model.Board_signal_num[signal_type][c.r][c.c] += val
 }

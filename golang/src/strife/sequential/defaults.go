@@ -19,4 +19,7 @@ var Default_Parameters = Parameters{
 	Public_Goods_Effect:          0.6}
 
 var Default_Settings = Settings{
-	Data_Filename: "data.dat"}
+	Snapshots_num:                5,
+	Frequencies_num:              10,
+	Neighborhood_Frequencies_num: 15,
+	Data_Filename:                "data.dat"}
