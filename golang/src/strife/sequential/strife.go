@@ -1,10 +1,8 @@
 package sequential
 
 import (
-	"fmt"
 	"math/rand"
 	"miscow"
-	"time"
 )
 
 var s4strain = [4]int{0, 0, 1, 1} // index is the strain. value is the signal allele.
@@ -14,15 +12,17 @@ func strain_spec(r, s int) int {
 	return r + s*2
 }
 
-func fitness(model *Model, coord Coordinate) float64 {
+func (model *Model) fitness(coord Coordinate) float64 {
 	// computes the fitness of a given cell
 	var cost float64 = model.Parameters.Basal_Cost
 
-	if model.Get_Cell_Prod(coord) {
+	coord_toroid := coord.get_toroid_coordinates(model.Parameters.Board_Size)
+
+	if model.get_cell_prod(coord_toroid) {
 		cost += model.Parameters.Cooperation_Cost
 	}
 
-	if model.Parameters.Cooperation_Effect_Threshold <= model.Get_Cell_PG_Num(coord) {
+	if model.Parameters.Cooperation_Effect_Threshold <= model.get_cell_pg_num(coord_toroid) {
 		cost *= model.Parameters.Public_Goods_Effect
 	}
 
@@ -32,7 +32,7 @@ func fitness(model *Model, coord Coordinate) float64 {
 
 func mutate(model *Model, coord Coordinate) int {
 	var r, s int
-	var strain int = model.Get_Cell_Strain(coord)
+	var strain int = model.get_cell_strain(coord)
 
 	r = r4strain[strain]
 	if rand.Float64() < model.Parameters.Mut_Odds_R {
@@ -49,38 +49,38 @@ func mutate(model *Model, coord Coordinate) int {
 
 func update_arrays(model *Model, coord Coordinate, newstrain, oldstrain int) {
 	var (
-		neighbor_strain          int
-		signal_i, signal_i_torus Coordinate
-		pg_i, pg_i_torus         Coordinate
-		oldprod                  bool
+		neighbor_strain                  int
+		signal_coord, signal_coord_torus Coordinate
+		pg_coord, pg_coord_torus         Coordinate
+		oldprod                          bool
 	)
 
-	for signal_i.r = coord.r - model.Parameters.S_Radius; signal_i.r <= coord.r+model.Parameters.S_Radius; signal_i.r++ {
-		for signal_i.c = coord.c - model.Parameters.S_Radius; signal_i.c <= coord.c+model.Parameters.S_Radius; signal_i.c++ {
-			// Get the toroid coordinates 
-			signal_i_torus = signal_i.Get_Toroid_Coordinates(model.Parameters.Board_Size)
+	for signal_coord.r = coord.r - model.Parameters.S_Radius; signal_coord.r <= coord.r+model.Parameters.S_Radius; signal_coord.r++ {
+		for signal_coord.c = coord.c - model.Parameters.S_Radius; signal_coord.c <= coord.c+model.Parameters.S_Radius; signal_coord.c++ {
+			signal_coord_torus = signal_coord.get_toroid_coordinates(model.Parameters.Board_Size)
+
 			// update signal level in sig range
-			model.Add_To_Cell_Signal_Num(signal_i_torus, s4strain[oldstrain], -1)
-			model.Add_To_Cell_Signal_Num(signal_i_torus, s4strain[newstrain], 1)
-			// update producer status in sig range
-			oldprod = model.Get_Cell_Prod(signal_i_torus)
-			neighbor_strain = model.Get_Cell_Strain(signal_i_torus)
-			if model.Parameters.Signal_Threshold <= model.Get_Cell_Signal_Num(signal_i_torus, r4strain[neighbor_strain]) {
-				model.Set_Cell_Prod(signal_i_torus, true)
+			model.Add_To_Cell_Signal_Num(signal_coord_torus, s4strain[oldstrain], -1)
+			model.Add_To_Cell_Signal_Num(signal_coord_torus, s4strain[newstrain], 1)
+
+			// update producer status at signal_coord_torus
+			oldprod = model.get_cell_prod(signal_coord_torus)
+			neighbor_strain = model.get_cell_strain(signal_coord_torus)
+			if model.Parameters.Signal_Threshold <= model.get_cell_signal_num(signal_coord_torus, r4strain[neighbor_strain]) {
+				model.set_cell_prod(signal_coord_torus, true)
 			} else {
-				model.Set_Cell_Prod(signal_i_torus, false)
+				model.set_cell_prod(signal_coord_torus, false)
 			}
-			// update pg level in sig+pg range
-			if oldprod != model.Get_Cell_Prod(signal_i_torus) {
-				for pg_i.r = signal_i.r - model.Parameters.PG_Radius; pg_i.r <= signal_i.r+model.Parameters.PG_Radius; pg_i.r++ {
-					for pg_i.c = signal_i.c - model.Parameters.PG_Radius; pg_i.c <= signal_i.c+model.Parameters.PG_Radius; pg_i.c++ {
-						pg_i_torus = Coordinate{r: (pg_i.r + model.Parameters.Board_Size) % model.Parameters.Board_Size,
-							c: (pg_i.c + model.Parameters.Board_Size) % model.Parameters.Board_Size}
-						switch model.Get_Cell_Prod(signal_i_torus) {
-						case true:
-							model.Add_To_Cell_PG_Num(pg_i_torus, 1)
-						default:
-							model.Add_To_Cell_PG_Num(pg_i_torus, -1)
+
+			// update PG levels around signal_coord
+			if oldprod != model.get_cell_prod(signal_coord_torus) {
+				for pg_coord.r = signal_coord.r - model.Parameters.PG_Radius; pg_coord.r <= signal_coord.r+model.Parameters.PG_Radius; pg_coord.r++ {
+					for pg_coord.c = signal_coord.c - model.Parameters.PG_Radius; pg_coord.c <= signal_coord.c+model.Parameters.PG_Radius; pg_coord.c++ {
+						pg_coord_torus = pg_coord.get_toroid_coordinates(model.Parameters.Board_Size)
+						if model.get_cell_prod(signal_coord_torus) {
+							model.Add_To_Cell_PG_Num(pg_coord_torus, 1)
+						} else {
+							model.Add_To_Cell_PG_Num(pg_coord_torus, -1)
 						}
 					}
 				}
@@ -97,9 +97,9 @@ func endgame(model *Model, winner_coord, loser_coord Coordinate) {
 	   lc - loser_coord's column
 	*/
 	newstrain := mutate(model, winner_coord)
-	if newstrain != model.Get_Cell_Strain(loser_coord) {
-		oldstrain := model.Get_Cell_Strain(loser_coord)
-		model.Set_Cell_Strain(loser_coord, newstrain)
+	if newstrain != model.get_cell_strain(loser_coord) {
+		oldstrain := model.get_cell_strain(loser_coord)
+		model.set_cell_strain(loser_coord, newstrain)
 		update_arrays(model, loser_coord, newstrain, oldstrain)
 	}
 }
@@ -107,28 +107,29 @@ func endgame(model *Model, winner_coord, loser_coord Coordinate) {
 func rand_neighbor(coord Coordinate, board_size int) (coord2 Coordinate) {
 	switch direction := rand.Intn(4); direction {
 	case 0:
-		coord2.r = coord.r
-		coord2.c = miscow.MyMod(coord.c-1, board_size)
+		return Coordinate{r: coord.r,
+			c: miscow.MyMod(coord.c-1, board_size)}
 	case 1:
-		coord2.r = miscow.MyMod(coord.r-1, board_size)
-		coord2.c = coord.r
+		return Coordinate{r: miscow.MyMod(coord.r-1, board_size),
+			c: coord.c}
 	case 2:
-		coord2.r = coord.r
-		coord2.c = miscow.MyMod(coord.c+1, board_size)
-	case 3:
-		coord2.r = miscow.MyMod(coord.r+1, board_size)
-		coord2.c = coord.r
+		return Coordinate{r: coord.r,
+			c: miscow.MyMod(coord.c+1, board_size)}
+	default:
+		return Coordinate{r: miscow.MyMod(coord.r+1, board_size),
+			c: coord.c}
 	}
 	return
 }
 
-func competition(model *Model) {
+func (model *Model) competition() {
+
 	var c1, c2 Coordinate
 	c1 = rand_coord(model.Parameters.Board_Size)
 	c2 = rand_neighbor(c1, model.Parameters.Board_Size)
 
-	fitness_1 := fitness(model, c1)
-	fitness_2 := fitness(model, c2)
+	fitness_1 := model.fitness(c1)
+	fitness_2 := model.fitness(c2)
 
 	// Randomize fo shizzles
 	score := rand.Float64()*fitness_1 - rand.Float64()*fitness_2
@@ -145,7 +146,7 @@ func competition(model *Model) {
 /*
 Takes a model and turns four cells 90 degrees
 */
-func diffuse(model *Model, coord00 Coordinate, direction bool) {
+func (model *Model) diffuse(coord00 Coordinate, direction bool) {
 	// at each whirl, 4 cells are moved
 	//var r0, c0, r1, c1 int
 	var before, after [2][2]int
@@ -159,10 +160,10 @@ func diffuse(model *Model, coord00 Coordinate, direction bool) {
 	coord10.c = coord11.r
 
 	// Save the tetrades
-	before[0][0] = model.Get_Cell_Strain(coord00)
-	before[0][1] = model.Get_Cell_Strain(coord01)
-	before[1][0] = model.Get_Cell_Strain(coord10)
-	before[1][1] = model.Get_Cell_Strain(coord11)
+	before[0][0] = model.get_cell_strain(coord00)
+	before[0][1] = model.get_cell_strain(coord01)
+	before[1][0] = model.get_cell_strain(coord10)
+	before[1][1] = model.get_cell_strain(coord11)
 
 	if direction {
 		// true is clockwise
@@ -196,10 +197,10 @@ func diffuse(model *Model, coord00 Coordinate, direction bool) {
 	//fmt.Println("(*model.Board_strain)[r1][c1]", (*model.Board_strain)[r1][c1])
 
 	// Assign the rotated cells
-	model.Set_Cell_Strain(coord00, after[0][0])
-	model.Set_Cell_Strain(coord01, after[0][1])
-	model.Set_Cell_Strain(coord10, after[1][0])
-	model.Set_Cell_Strain(coord11, after[1][1])
+	model.set_cell_strain(coord00, after[0][0])
+	model.set_cell_strain(coord01, after[0][1])
+	model.set_cell_strain(coord10, after[1][0])
+	model.set_cell_strain(coord11, after[1][1])
 
 	//fmt.Println("(*model.Board_strain)[r0][c0]", (*model.Board_strain)[r0][c0])
 	//fmt.Println("(*model.Board_strain)[r0][c1]", (*model.Board_strain)[r0][c1])
@@ -210,14 +211,4 @@ func diffuse(model *Model, coord00 Coordinate, direction bool) {
 	update_arrays(model, coord01, after[0][1], before[0][1])
 	update_arrays(model, coord10, after[1][0], before[1][0])
 	update_arrays(model, coord11, after[1][1], before[1][1])
-}
-
-func showtiming(t_start time.Time, dt_iter time.Duration) {
-	t_elapsed := time.Now().Sub(t_start)
-	dt_tot_runtime := time.Duration(dt_iter.Nanoseconds()*10000) * time.Nanosecond
-	t_finish := t_start.Add(dt_tot_runtime)
-
-	fmt.Println("Since start:", t_elapsed)
-	fmt.Println("Expected total run time:", dt_tot_runtime)
-	fmt.Println("Finish time:", t_finish)
 }

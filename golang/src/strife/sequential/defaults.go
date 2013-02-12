@@ -22,4 +22,4 @@ var Default_Settings = Settings{
 	Snapshots_num:                5,
 	Frequencies_num:              10,
 	Neighborhood_Frequencies_num: 15,
-	Data_Filename:                "data.dat"}
+	Data_Filename:                "model-data.dat"}

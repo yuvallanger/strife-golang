@@ -10,7 +10,7 @@ import (
 
 type Coordinate struct{ i, j int }
 
-func Main() {
+func Main(cpuprofile *string) {
 	ncpu := runtime.NumCPU()
 	fmt.Printf("previous GOMAXPROCS: %+v; now: %+v\n", runtime.GOMAXPROCS(ncpu), ncpu)
 	fmt.Scanln()
@@ -92,9 +92,9 @@ func fire_cells(m Concur_Model) {
 	}
 	sum := 0
 	for i := 0; i < m.N*m.N; i++ {
-        a_res := <-res
-        fmt.Println(a_res)
-        sum += a_res
+		a_res := <-res
+		fmt.Println(a_res)
+		sum += a_res
 	}
 	fmt.Println("Done. Sum:", sum)
 	fmt.Scanln()
@@ -112,17 +112,17 @@ func cell_go(r *rand.Rand, initstate CellState, neighbors_chans [8]chan CellComm
 				CellState: CellState{signal: mystate.signal}}
 		}(neighbors_chans[i])
 	}
-    fmt.Printf("id: %v; after signal\n", id)
+	fmt.Printf("id: %v; after signal\n", id)
 	for i := 0; i < 8; i++ {
 		a_comm = <-inbox_chan
-        fmt.Printf("id: %v; a_comm: %v\n", id, a_comm)
+		fmt.Printf("id: %v; a_comm: %v\n", id, a_comm)
 		switch a_comm {
 		case CellComm{CellState: CellState{signal: true}}:
-            fmt.Printf("id: %v; signal_num++", id)
-		 	mystate.signal_num++
-        case CellComm{CellState: CellState{signal:false}}:
-            fmt.Printf("id: %v; signal_num=", id)
-            continue
+			fmt.Printf("id: %v; signal_num++", id)
+			mystate.signal_num++
+		case CellComm{CellState: CellState{signal: false}}:
+			fmt.Printf("id: %v; signal_num=", id)
+			continue
 		}
 	}
 	res <- mystate.signal_num

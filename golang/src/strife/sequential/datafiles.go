@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 )
 
 /*
@@ -34,15 +35,15 @@ func (model *Model) save_h5() {
 }
 */
 
-func save_json(model *Model) error {
+func (model *Model) save_json() error {
 	jsonModel, err := json.Marshal(model)
 	if err != nil {
-		return err
+		log.Panicln(err)
 	}
-	file, err := ioutil.TempFile("/home/yankel/",
-		fmt.Sprintf("strife-%v-%v-", model.Start_Time, model.Generation_i))
+	file, err := ioutil.TempFile(".",
+		fmt.Sprintf("%v-%v-%v-", model.Settings.Data_Filename, model.Start_Time, model.Generation_i))
 	if err != nil {
-		return err
+		log.Panicln(err)
 	}
 	defer file.Close()
 	file.Write(jsonModel)

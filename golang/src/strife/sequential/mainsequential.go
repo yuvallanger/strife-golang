@@ -3,17 +3,21 @@ package sequential
 
 import (
 	"code.google.com/p/gcfg"
+	"flag"
 	"fmt"
+	"log"
 	"math/rand"
-	"miscow"
+	"os"
+	"runtime/pprof"
 	"time"
 )
 
 func load_config() (parameters Parameters, settings Settings) {
 	var cfg Config
-	err := gcfg.ReadFileInto(&cfg, "strife.conf")
+	settings_filename := "strife.conf"
+	err := gcfg.ReadFileInto(&cfg, settings_filename)
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("settings file: %+v; error: %+v\n", settings_filename, err)
 		parameters = Default_Parameters
 		settings = Default_Settings
 	} else {
@@ -23,33 +27,24 @@ func load_config() (parameters Parameters, settings Settings) {
 	return
 }
 
-func get_sample_rate(m *Model) int {
+func (m *Model) get_sample_rate() int {
 	if m.Settings.Snapshots_num != 0 {
 		return m.Parameters.Generations/m.Settings.Snapshots_num + 1
 	}
 	return 0
 }
 
-func init_databoard_snapshots(model *Model) {
-	if model.Settings.Snapshots_num != 0 {
-		if model.Parameters.Generations%model.Settings.Snapshots_num == 0 {
-			model.Data_Boards.Snapshots = make([]Snapshot, model.Settings.Snapshots_num)
-		} else {
-			// if we have number of generations that does not divides with number of snapshots, we want another snapshot at the end.
-			model.Data_Boards.Snapshots = make([]Snapshot, model.Settings.Snapshots_num+1)
+func Main(cpuprofile *string) {
+	fmt.Println(flag.Args())
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
 		}
-		for snapshot_i := range model.Data_Boards.Snapshots {
-			data := miscow.Make2dIntArray(model.Parameters.Board_Size, model.Parameters.Board_Size)
-			model.Data_Boards.Snapshots[snapshot_i].Data = data
-		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
 	}
-}
 
-func init_databoards(model *Model) {
-	init_databoard_snapshots(model)
-}
-
-func Main() {
 	// Reading configuration file
 	model := new(Model)
 	params, settings := load_config()
@@ -59,72 +54,102 @@ func Main() {
 	fmt.Printf("Parameters:\n%+v\n", model.Parameters)
 	fmt.Printf("Settings:\n%+v\n", model.Settings)
 
-	init_boards(model)
-	init_databoards(model)
-
-	err := save_json(model)
+	model.init_boards()
+	model.init_data_samples()
+	err := model.save_json()
 	if err != nil {
 		panic(fmt.Sprintf("save_json() error: %v", err))
 	}
 
-	//fmt.Println("Board strain:\n", model.Board_strain)
+	model.run()
 
-	run(model)
-
-	save_json(model)
-	//fmt.Println("Board strain:\n", model.Board_strain)
-	//fmt.Println("model.params:\n", model.Parameters)
-	//fmt.Println("model.settings:\n", model.Settings)
-	fmt.Print()
+	model.save_json()
 }
 
-func run(model *Model) {
-	var sample_rate int = get_sample_rate(model)
-	diffusion_num := int(model.Parameters.D * float64(model.Parameters.Board_Size*model.Parameters.Board_Size) / 4)
+func (model *Model) get_diffusion_iter_per_generation() int {
+	return int(model.Parameters.D * float64(model.Parameters.Board_Size*model.Parameters.Board_Size) / 4)
+}
+
+func (model *Model) showboards() {
+	/*
+		fmt.Println(model.Board_strain)
+		fmt.Scanln()
+		fmt.Println(model.Board_signal_num)
+		fmt.Scanln()
+		fmt.Println(model.Board_prod)
+		fmt.Scanln()
+		fmt.Println(model.Board_pg_num)
+		fmt.Scanln()
+	*/
+}
+func (model *Model) run() {
+	var snapshots_sample_rate int = model.get_sample_rate()
+	var diffusion_num int = model.get_diffusion_iter_per_generation()
 	fmt.Println("diffusion_num: ", diffusion_num)
 	fmt.Println("model.Parameters.Generations = ", model.Parameters.Generations)
 	fmt.Println("model.Generation_i = ", model.Generation_i)
 	tstart := time.Now()
+
 	for model.Generation_i = 0; model.Generation_i < model.Parameters.Generations; model.Generation_i++ {
 		time_per_iter := time.Now()
-
-		board_size := model.Parameters.Board_Size
-		//fmt.Printf("Generation: %v\n", model.Generation_i)
-		for competition_i := 0; competition_i < board_size*board_size; competition_i++ {
-			competition(model)
+		model.showboards()
+		for competition_i := 0; competition_i < model.Parameters.Board_Size*model.Parameters.Board_Size; competition_i++ {
+			model.competition()
 		}
+		model.showboards()
+
 		for diffusion_i := 0; diffusion_i < diffusion_num; diffusion_i++ {
 			if rand.Intn(2) == 0 {
-				diffuse(model,
-					Coordinate{r: rand.Intn(model.Parameters.Board_Size),
-						c: rand.Intn(model.Parameters.Board_Size)},
+				model.diffuse(Coordinate{r: rand.Intn(model.Parameters.Board_Size),
+					c: rand.Intn(model.Parameters.Board_Size)},
 					true)
 			} else {
-				diffuse(model,
-					Coordinate{r: rand.Intn(model.Parameters.Board_Size),
-						c: rand.Intn(model.Parameters.Board_Size)},
+				model.diffuse(Coordinate{r: rand.Intn(model.Parameters.Board_Size),
+					c: rand.Intn(model.Parameters.Board_Size)},
 					false)
 			}
 		}
+		model.showboards()
 
-		if model.Generation_i%100 == 0 {
-			showtiming(tstart, time.Since(time_per_iter))
-		}
+		model.showtiming(tstart, time.Since(time_per_iter))
 
-		//func (t Time) Add(d Duration) Time
-		//func Since(t Time) Duration
-		//func (t Time) Sub(u Time) Duration
+		// take a snapshot only if we were asked to.
 		if model.Settings.Snapshots_num != 0 {
-			if model.Generation_i%sample_rate == 0 || model.Generation_i == model.Parameters.Generations-1 {
-				fmt.Printf("data to json: generation: %v\n", model.Generation_i)
-				fmt.Printf("data to json: model.Generation_i/sample_rate: %v\n",
-					model.Generation_i/sample_rate)
-				model.Data_Boards.Snapshots[model.Generation_i/sample_rate] = Snapshot{
-					Data:       model.Board_strain,
-					Generation: model.Generation_i}
+			// take snapshot only every snapshots_sample_rate generations
+			// or when we're at the last generation.
+			if model.Generation_i%snapshots_sample_rate == 0 || model.Generation_i == model.Parameters.Generations-1 {
+				model.take_strain_snapshot()
 			}
 		}
 	}
-	fmt.Println()
-	return
+}
+
+func (model *Model) take_strain_snapshot() {
+	for i := range model.Board_strain {
+		model.Data_Boards.Snapshots[len(model.Data_Boards.Snapshots)-1].Data[i] = append([]int{}, model.Board_strain[i]...)
+	}
+	model.Data_Boards.Snapshots[len(model.Data_Boards.Snapshots)-1].Generation = model.Generation_i
+	//	fmt.Println(model.Board_strain)
+
+	/*	fmt.Println("Snapshots after assignment", model.Data_Boards.Snapshots[0],
+		len(model.Data_Boards.Snapshots),
+		cap(model.Data_Boards.Snapshots))
+	*/
+
+	if len(model.Data_Boards.Snapshots) < cap(model.Data_Boards.Snapshots) {
+		model.Data_Boards.Snapshots = model.Data_Boards.Snapshots[0 : len(model.Data_Boards.Snapshots)+1]
+	}
+}
+
+func (model *Model) showtiming(t_start time.Time, dt_iter time.Duration) {
+	t_elapsed := time.Now().Sub(t_start)
+	dt_tot_runtime := time.Duration(dt_iter.Nanoseconds()*int64(model.Parameters.Generations)) * time.Nanosecond
+	dt_tot_runtime_300_10000 := time.Duration(dt_iter.Nanoseconds()*10000*300*300/int64(model.Parameters.Board_Size*model.Parameters.Board_Size)) * time.Nanosecond
+
+	t_finish := t_start.Add(dt_tot_runtime)
+
+	fmt.Println("Since start:", t_elapsed)
+	fmt.Println("Expected total run time:", dt_tot_runtime)
+	fmt.Println("Expected total run time (10k gen, 300^2 board):", dt_tot_runtime_300_10000)
+	fmt.Println("Finish time:", t_finish)
 }

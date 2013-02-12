@@ -30,7 +30,7 @@ type Model struct {
 
 type Snapshot struct {
 	Generation int
-	Data       [][]int
+	Data       Board_strain
 }
 
 type Snapshots []Snapshot
@@ -92,45 +92,11 @@ type Coordinate struct {
 Returns the same coordinates in modulus the size of the board.
 Board is a square, not a rectangle, so we need only one size argument.
 */
-func (c *Coordinate) Get_Toroid_Coordinates(board_size int) Coordinate {
+func (c *Coordinate) get_toroid_coordinates(board_size int) Coordinate {
 	return Coordinate{r: miscow.MyMod(c.r, board_size),
 		c: miscow.MyMod(c.c, board_size)}
 }
 
-/*
-func (board *Board_strain) get_cell(c Coordinate) int {
-	return (*board)[c.r][c.c]
-}
-
-func (board *Board_signal_num) get_cell(signal int, c Coordinate) int {
-	return (*board)[signal][c.r][c.c]
-}
-
-func (board *Board_prod) get_cell(c Coordinate) bool {
-	return (*board)[c.r][c.c]
-}
-
-func (board *Board_pg_num) get_cell(c Coordinate) int {
-	return (*board)[c.r][c.c]
-}
-
-func (board *Board_strain) set_cell(c Coordinate, strain int) {
-	(*board)[c.r][c.c] = strain
-}
-
-func (board *Board_signal_num) set_cell(signal_coordinate int, c Coordinate, signal_num int) {
-	(*board)[signal_coordinate][c.r][c.c] = signal_num
-}
-
-func (board *Board_prod) set_cell(c Coordinate, prod bool) {
-	(*board)[c.r][c.c] = prod
-}
-
-// TODO remove all "func (board *Board_foo) .." functions an replace with "func (model *Model) .."
-func (board *Board_pg_num) set_cell(c Coordinate, pg_num int) {
-	(*board)[c.r][c.c] = pg_num
-}
-*/
 func rand_coord(board_size int) Coordinate {
 	return Coordinate{
 		r: rand.Intn(board_size),
@@ -138,8 +104,6 @@ func rand_coord(board_size int) Coordinate {
 }
 
 func (board_strain Board_strain) String() (s string) {
-	miscow.Trace("(Board_strain) String()")
-	defer miscow.Untrace("(Board_strain) String()")
 	s = " "
 	for i := range board_strain {
 		s += fmt.Sprintf("%2v", i)
@@ -202,53 +166,40 @@ func (p Parameters) String() (s string) {
 	return
 }
 func (model *Model) String() (s string) {
-	miscow.Trace("(Model) String()")
-	defer miscow.Untrace("(Model) String()")
 	s += fmt.Sprintf("model.params:\n%v\n", model.Parameters)
 	s += fmt.Sprintf("%v\n", model.Board_strain)
 	return
 }
 
-type Simulation interface {
-	GetCellStrain(c Coordinate) int
-	GetCellProd(c Coordinate) bool
-	GetCellSignalNum(c Coordinate) int
-	GetCellPGNum(c Coordinate) bool
-	SetCellStrain(c Coordinate, val int)
-	SetCellProd(c Coordinate, val bool)
-	SetCellSignalNum(c Coordinate, val int)
-	SetCellPGNum(c Coordinate, val bool)
-}
-
-func (model *Model) Get_Cell_Strain(c Coordinate) int {
+func (model *Model) get_cell_strain(c Coordinate) int {
 	return (model.Board_strain)[c.r][c.c]
 }
 
-func (model *Model) Get_Cell_Prod(c Coordinate) bool {
+func (model *Model) get_cell_prod(c Coordinate) bool {
 	return (model.Board_prod)[c.r][c.c]
 }
 
-func (model *Model) Get_Cell_Signal_Num(c Coordinate, signal_type int) int {
+func (model *Model) get_cell_signal_num(c Coordinate, signal_type int) int {
 	return (model.Board_signal_num)[signal_type][c.r][c.c]
 }
 
-func (model *Model) Get_Cell_PG_Num(c Coordinate) int {
-	return (model.Board_pg_num)[c.r][c.c]
+func (model *Model) get_cell_pg_num(c Coordinate) int {
+	return model.Board_pg_num[c.r][c.c]
 }
 
-func (model *Model) Set_Cell_Strain(c Coordinate, val int) {
+func (model *Model) set_cell_strain(c Coordinate, val int) {
 	(model.Board_strain)[c.r][c.c] = val
 }
 
-func (model *Model) Set_Cell_Prod(c Coordinate, val bool) {
+func (model *Model) set_cell_prod(c Coordinate, val bool) {
 	(model.Board_prod)[c.r][c.c] = val
 }
 
-func (model *Model) Set_Cell_Signal_Num(signal_type int, c Coordinate, val int) {
+func (model *Model) set_cell_signal_num(c Coordinate, signal_type int, val int) {
 	(model.Board_signal_num)[signal_type][c.r][c.c] = val
 }
 
-func (model *Model) Set_Cell_PG_Num(c Coordinate, val int) {
+func (model *Model) set_cell_pg_num(c Coordinate, val int) {
 	(model.Board_pg_num)[c.r][c.c] = val
 }
 
