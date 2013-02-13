@@ -34,7 +34,7 @@ func (m *Model) get_sample_rate() int {
 	return 0
 }
 
-func Main(cpuprofile *string) {
+func Main(cpuprofile *string, imagesflag *bool) {
 	fmt.Println(flag.Args())
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -66,7 +66,9 @@ func Main(cpuprofile *string) {
 	if err := model.save_json(); err != nil {
 		panic(err)
 	}
-	model.Save_snapshots_as_images()
+	if *imagesflag {
+		model.Save_snapshots_as_images()
+	}
 
 }
 

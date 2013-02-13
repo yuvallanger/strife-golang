@@ -11,6 +11,7 @@ import (
 var sequentialflag = flag.Bool("sequential", true, "Run sequential model.")
 var concurrentflag = flag.Bool("concur", false, "Run concurrent model.")
 var cpuprofile = flag.String("cpuprofile", "", "Write cpu profile to file.")
+var imagesflag = flag.Bool("images", false, "Output snapshots as images.")
 
 func main() {
 	flag.Parse()
@@ -22,7 +23,7 @@ func main() {
 		log.Fatalf("Should only use one of the two.")
 	}
 	if *sequentialflag {
-		sequential.Main(cpuprofile)
+		sequential.Main(cpuprofile, imagesflag)
 	}
 	if *concurrentflag {
 		concurrent.Main(cpuprofile)
