@@ -6,6 +6,10 @@ import (
 	"miscow"
 )
 
+var r4strain = [8]int{0, 1, 0, 1, 0, 1, 0, 1} // index is the strain. value is the receptor allele.
+var s4strain = [8]int{0, 0, 1, 1, 0, 0, 1, 1} // index is the strain. value is the signal allele.
+var g4strain = [8]int{0, 0, 0, 0, 1, 1, 1, 1} // index is the strain. value is the receptor allele.
+
 type Board_strain [][]int       // [rows][columns]. possible values: {0,1,2,3}. s0r0 - 0; s0r1 - 1; s1r0 - 2; s1r1 - 3
 type Board_signal_num [][][]int // [signal types][rows][columns]
 type Board_prod [][]bool        // [rows][columns]
@@ -195,7 +199,7 @@ func (model *Model) set_cell_prod(c Coordinate, val bool) {
 	(model.Board_prod)[c.r][c.c] = val
 }
 
-func (model *Model) set_cell_signal_num(c Coordinate, signal_type int, val int) {
+func (model *Model) set_cell_signal_num(c Coordinate, signal_type, val int) {
 	(model.Board_signal_num)[signal_type][c.r][c.c] = val
 }
 

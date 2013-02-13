@@ -56,14 +56,18 @@ func Main(cpuprofile *string) {
 
 	model.init_boards()
 	model.init_data_samples()
-	err := model.save_json()
-	if err != nil {
-		panic(fmt.Sprintf("save_json() error: %v", err))
+
+	if err := model.save_json(); err != nil {
+		panic(err)
 	}
 
 	model.run()
 
-	model.save_json()
+	if err := model.save_json(); err != nil {
+		panic(err)
+	}
+	model.Save_snapshots_as_images()
+
 }
 
 func (model *Model) get_diffusion_iter_per_generation() int {

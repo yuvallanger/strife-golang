@@ -5,9 +5,6 @@ import (
 	"miscow"
 )
 
-var s4strain = [4]int{0, 0, 1, 1} // index is the strain. value is the signal allele.
-var r4strain = [4]int{0, 1, 0, 1} // index is the strain. value is the receptor allele.
-
 func strain_spec(r, s int) int {
 	return r + s*2
 }
