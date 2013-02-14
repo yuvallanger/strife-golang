@@ -1,9 +1,7 @@
 package sequential
 
 import (
-	//"fmt"
 	"math/rand"
-	"miscow"
 )
 
 func (model *Model) init_board_strain() {
@@ -112,22 +110,64 @@ func (model *Model) init_boards() {
 // TODO this comment sucks. initialize all the data samples
 func (model *Model) init_data_samples() {
 	model.init_data_samples_snapshots()
+	model.init_data_samples_frequencies()
+	model.init_data_samples_neighborhood_frequencies()
 }
 
-// TODO comment initialize the snapshots samples
+// Initialize the board snapshots samples
 func (model *Model) init_data_samples_snapshots() {
-	if model.Settings.Snapshots_num != 0 {
-		if model.Parameters.Generations%model.Settings.Snapshots_num == 0 {
+	if model.Settings.Snapshots_sample_num != 0 {
+		if model.Parameters.Generations%model.Settings.Snapshots_sample_num == 0 {
 			// the case in which the last snapshot is the same as the last generation
-			model.Data_Boards.Snapshots = make([]Snapshot, model.Settings.Snapshots_num+1)
+			model.Data_samples.Snapshots = make([]Snapshot, 1, model.Settings.Snapshots_sample_num)
 		} else {
 			// the case in which the last snapshot isn't the same as the last generation
-			model.Data_Boards.Snapshots = make([]Snapshot, model.Settings.Snapshots_num+1)
+			model.Data_samples.Snapshots = make([]Snapshot, 1, model.Settings.Snapshots_sample_num+1)
 		}
-		for snapshot_i := range model.Data_Boards.Snapshots {
-			data := miscow.Make2dIntArray(model.Parameters.Board_Size, model.Parameters.Board_Size)
-			model.Data_Boards.Snapshots[snapshot_i].Data = data
+		for sample_i := range model.Data_samples.Snapshots {
+			data := make([][]int, model.Parameters.Board_Size)
+			for row := range data {
+				data[row] = make([]int, model.Parameters.Board_Size)
+			}
+			model.Data_samples.Snapshots[sample_i].Data = data
 		}
 	}
-	model.Data_Boards.Snapshots = model.Data_Boards.Snapshots[0:1]
+}
+
+// Initialize the strain frequencies samples
+func (model *Model) init_data_samples_frequencies() {
+	if model.Settings.Frequencies_sample_num != 0 {
+		if model.Parameters.Generations%model.Settings.Frequencies_sample_num == 0 {
+			// the case in which the last sample is the same as the last generation
+			model.Data_samples.Frequencies = make([]Frequency, 1, model.Settings.Frequencies_sample_num)
+		} else {
+			// the case in which the last sample isn't the same as the last generation
+			model.Data_samples.Frequencies = make([]Frequency, 1, model.Settings.Frequencies_sample_num+1)
+		}
+		for sample_i := range model.Data_samples.Frequencies {
+			model.Data_samples.Frequencies[sample_i].Data = make([]int, 8)
+		}
+	}
+}
+
+// Initialize the neighbors frequencies samples
+func (model *Model) init_data_samples_neighborhood_frequencies() {
+	if model.Settings.Neighborhood_frequencies_sample_num != 0 {
+		if model.Parameters.Generations%model.Settings.Neighborhood_frequencies_sample_num == 0 {
+			// the case in which the last sample is the same as the last generation
+			model.Data_samples.Neighbors_frequencies = make([]Neighbors_frequency, model.Settings.Neighborhood_frequencies_sample_num)
+		} else {
+			// the case in which the last sample isn't the same as the last generation
+			model.Data_samples.Neighbors_frequencies = make([]Neighbors_frequency, model.Settings.Neighborhood_frequencies_sample_num+1)
+		}
+		for sample_i := range model.Data_samples.Neighbors_frequencies {
+			data := make([][]int, 8)
+			// for each strain we'll count how many strains are around it.
+			for strain_i := range data {
+				data[strain_i] = make([]int, 8)
+			}
+			model.Data_samples.Neighbors_frequencies[sample_i].Data = data
+		}
+	}
+	model.Data_samples.Neighbors_frequencies = model.Data_samples.Neighbors_frequencies[0:1]
 }

@@ -5,11 +5,11 @@ import (
 	"miscow"
 )
 
-func strain_spec(r, s int) int {
-	return r + s*2
+func strain_spec(r, s, g int) int {
+	return r + s*2 + g*4
 }
 
-func (model *Model) fitness(coord Coordinate) float64 {
+func (model *Model) avigdor_fitness(coord Coordinate) float64 {
 	// computes the fitness of a given cell
 	var cost float64 = model.Parameters.Basal_Cost
 
@@ -27,7 +27,7 @@ func (model *Model) fitness(coord Coordinate) float64 {
 
 }
 
-func mutate(model *Model, coord Coordinate) int {
+func avigdor_mutate(model *Model, coord Coordinate) int {
 	var r, s int
 	var strain int = model.get_cell_strain(coord)
 
@@ -41,10 +41,10 @@ func mutate(model *Model, coord Coordinate) int {
 		s = 1 - s
 	}
 
-	return (r + 2*s)
+	return strain_spec(r, s, 1) // in Avigdor's model, the public goods allele is always functional (but not always expressed).
 }
 
-func update_arrays(model *Model, coord Coordinate, newstrain, oldstrain int) {
+func (model *Model) avigdor_update_arrays(coord Coordinate, newstrain, oldstrain int) {
 	var (
 		neighbor_strain                  int
 		signal_coord, signal_coord_torus Coordinate
@@ -60,9 +60,10 @@ func update_arrays(model *Model, coord Coordinate, newstrain, oldstrain int) {
 			model.Add_To_Cell_Signal_Num(signal_coord_torus, s4strain[oldstrain], -1)
 			model.Add_To_Cell_Signal_Num(signal_coord_torus, s4strain[newstrain], 1)
 
-			// update producer status at signal_coord_torus
 			oldprod = model.get_cell_prod(signal_coord_torus)
 			neighbor_strain = model.get_cell_strain(signal_coord_torus)
+			// update producer status at signal_coord_torus
+			// Production is active if the signal level at signal_coord (that is also compatible with signal_coord's receptor) is above the quorum sensing threshold.
 			if model.Parameters.Signal_Threshold <= model.get_cell_signal_num(signal_coord_torus, r4strain[neighbor_strain]) {
 				model.set_cell_prod(signal_coord_torus, true)
 			} else {
@@ -74,6 +75,8 @@ func update_arrays(model *Model, coord Coordinate, newstrain, oldstrain int) {
 				for pg_coord.r = signal_coord.r - model.Parameters.PG_Radius; pg_coord.r <= signal_coord.r+model.Parameters.PG_Radius; pg_coord.r++ {
 					for pg_coord.c = signal_coord.c - model.Parameters.PG_Radius; pg_coord.c <= signal_coord.c+model.Parameters.PG_Radius; pg_coord.c++ {
 						pg_coord_torus = pg_coord.get_toroid_coordinates(model.Parameters.Board_Size)
+
+						// We change PG level at signal_coord's neighbors
 						if model.get_cell_prod(signal_coord_torus) {
 							model.Add_To_Cell_PG_Num(pg_coord_torus, 1)
 						} else {
@@ -86,57 +89,37 @@ func update_arrays(model *Model, coord Coordinate, newstrain, oldstrain int) {
 	}
 }
 
-func endgame(model *Model, winner_coord, loser_coord Coordinate) {
-	/*
-	   wr - winner_coord's row
-	   wc - winner_coord's column
-	   lr - loser_coord's row
-	   lc - loser_coord's column
-	*/
-	newstrain := mutate(model, winner_coord)
-	if newstrain != model.get_cell_strain(loser_coord) {
-		oldstrain := model.get_cell_strain(loser_coord)
+/*
+Endgame copies the winning cell into the losing one's position.
+Before the cell is copied, we pass it through mutate().
+*/
+func (model *Model) avigdor_endgame(winner_coord, loser_coord Coordinate) {
+	newstrain := avigdor_mutate(model, winner_coord)
+	oldstrain := model.get_cell_strain(loser_coord)
+	if newstrain != oldstrain {
 		model.set_cell_strain(loser_coord, newstrain)
-		update_arrays(model, loser_coord, newstrain, oldstrain)
+		model.avigdor_update_arrays(loser_coord, newstrain, oldstrain)
 	}
 }
 
-func rand_neighbor(coord Coordinate, board_size int) (coord2 Coordinate) {
-	switch direction := rand.Intn(4); direction {
-	case 0:
-		return Coordinate{r: coord.r,
-			c: miscow.MyMod(coord.c-1, board_size)}
-	case 1:
-		return Coordinate{r: miscow.MyMod(coord.r-1, board_size),
-			c: coord.c}
-	case 2:
-		return Coordinate{r: coord.r,
-			c: miscow.MyMod(coord.c+1, board_size)}
-	default:
-		return Coordinate{r: miscow.MyMod(coord.r+1, board_size),
-			c: coord.c}
-	}
-	return
-}
-
-func (model *Model) competition() {
+func (model *Model) avigdor_competition() {
 
 	var c1, c2 Coordinate
 	c1 = rand_coord(model.Parameters.Board_Size)
 	c2 = rand_neighbor(c1, model.Parameters.Board_Size)
 
-	fitness_1 := model.fitness(c1)
-	fitness_2 := model.fitness(c2)
+	fitness_1 := model.avigdor_fitness(c1)
+	fitness_2 := model.avigdor_fitness(c2)
 
 	// Randomize fo shizzles
 	score := rand.Float64()*fitness_1 - rand.Float64()*fitness_2
 
 	if score > 0 {
 		// cell 1 wins
-		endgame(model, c1, c2)
+		model.avigdor_endgame(c1, c2)
 	} else {
 		// cell 2 wins
-		endgame(model, c2, c1)
+		model.avigdor_endgame(c2, c1)
 	}
 }
 
@@ -176,36 +159,14 @@ func (model *Model) diffuse(coord00 Coordinate, direction bool) {
 		after[1][1] = before[1][0]
 	}
 
-	//fmt.Println("[r0][c0]", r0, c0)
-	//fmt.Println("[r0][c1]", r0, c1)
-	//fmt.Println("[r1][c0]", r1, c0)
-	//fmt.Println("[r1][c1]", r1, c1)
-	//fmt.Println("before[0][0]", before[0][0])
-	//fmt.Println("before[0][1]", before[0][1])
-	//fmt.Println("before[1][0]", before[1][0])
-	//fmt.Println("before[1][1]", before[1][1])
-	//fmt.Println("after[0][0]", after[0][0])
-	//fmt.Println("after[0][1]", after[0][1])
-	//fmt.Println("after[1][0]", after[1][0])
-	//fmt.Println("after[1][1]", after[1][1])
-	//fmt.Println("(*model.Board_strain)[r0][c0]", (*model.Board_strain)[r0][c0])
-	//fmt.Println("(*model.Board_strain)[r0][c1]", (*model.Board_strain)[r0][c1])
-	//fmt.Println("(*model.Board_strain)[r1][c0]", (*model.Board_strain)[r1][c0])
-	//fmt.Println("(*model.Board_strain)[r1][c1]", (*model.Board_strain)[r1][c1])
-
 	// Assign the rotated cells
 	model.set_cell_strain(coord00, after[0][0])
 	model.set_cell_strain(coord01, after[0][1])
 	model.set_cell_strain(coord10, after[1][0])
 	model.set_cell_strain(coord11, after[1][1])
 
-	//fmt.Println("(*model.Board_strain)[r0][c0]", (*model.Board_strain)[r0][c0])
-	//fmt.Println("(*model.Board_strain)[r0][c1]", (*model.Board_strain)[r0][c1])
-	//fmt.Println("(*model.Board_strain)[r1][c0]", (*model.Board_strain)[r1][c0])
-	//fmt.Println("(*model.Board_strain)[r1][c1]", (*model.Board_strain)[r1][c1])
-
-	update_arrays(model, coord00, after[0][0], before[0][0])
-	update_arrays(model, coord01, after[0][1], before[0][1])
-	update_arrays(model, coord10, after[1][0], before[1][0])
-	update_arrays(model, coord11, after[1][1], before[1][1])
+	model.avigdor_update_arrays(coord00, after[0][0], before[0][0])
+	model.avigdor_update_arrays(coord01, after[0][1], before[0][1])
+	model.avigdor_update_arrays(coord10, after[1][0], before[1][0])
+	model.avigdor_update_arrays(coord11, after[1][1], before[1][1])
 }

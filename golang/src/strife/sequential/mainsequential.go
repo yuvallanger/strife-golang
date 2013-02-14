@@ -9,15 +9,19 @@ import (
 	"math/rand"
 	"os"
 	"runtime/pprof"
+	"strife/flags"
 	"time"
 )
 
-func load_config() (parameters Parameters, settings Settings) {
+func load_config(cmdln_flags flags.Flags) (parameters Parameters, settings Settings) {
 	var cfg Config
 	settings_filename := "strife.conf"
+	if cmdln_flags.Settings_filename_flag != "" {
+		settings_filename = cmdln_flags.Settings_filename_flag
+	}
 	err := gcfg.ReadFileInto(&cfg, settings_filename)
 	if err != nil {
-		log.Printf("settings file: %+v; error: %+v\n", settings_filename, err)
+		log.Panicf("settings file: %+v; error: %+v\n", settings_filename, err)
 		parameters = Default_Parameters
 		settings = Default_Settings
 	} else {
@@ -28,16 +32,18 @@ func load_config() (parameters Parameters, settings Settings) {
 }
 
 func (m *Model) get_sample_rate() int {
-	if m.Settings.Snapshots_num != 0 {
-		return m.Parameters.Generations/m.Settings.Snapshots_num + 1
+	if m.Settings.Snapshots_sample_num != 0 {
+		return m.Parameters.Generations/m.Settings.Snapshots_sample_num + 1
 	}
 	return 0
 }
 
-func Main(cpuprofile *string, imagesflag *bool) {
+func Main(cmdln_flags flags.Flags) {
+	flag.Parse()
 	fmt.Println(flag.Args())
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
+
+	if cmdln_flags.Cpuprofileflag != "" {
+		f, err := os.Create(cmdln_flags.Cpuprofileflag)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -47,7 +53,11 @@ func Main(cpuprofile *string, imagesflag *bool) {
 
 	// Reading configuration file
 	model := new(Model)
-	params, settings := load_config()
+	params, settings := load_config(cmdln_flags)
+	fmt.Println(params)
+	fmt.Scanln()
+	fmt.Println(settings)
+	fmt.Scanln()
 	model.Start_Time = fmt.Sprintf("%v", time.Now().UnixNano())
 	model.Parameters = params
 	model.Settings = settings
@@ -66,7 +76,7 @@ func Main(cpuprofile *string, imagesflag *bool) {
 	if err := model.save_json(); err != nil {
 		panic(err)
 	}
-	if *imagesflag {
+	if cmdln_flags.Imagesflag {
 		model.Save_snapshots_as_images()
 	}
 
@@ -100,7 +110,7 @@ func (model *Model) run() {
 		time_per_iter := time.Now()
 		model.showboards()
 		for competition_i := 0; competition_i < model.Parameters.Board_Size*model.Parameters.Board_Size; competition_i++ {
-			model.competition()
+			model.avigdor_competition()
 		}
 		model.showboards()
 
@@ -120,7 +130,7 @@ func (model *Model) run() {
 		model.showtiming(tstart, time.Since(time_per_iter))
 
 		// take a snapshot only if we were asked to.
-		if model.Settings.Snapshots_num != 0 {
+		if model.Settings.Snapshots_sample_num != 0 {
 			// take snapshot only every snapshots_sample_rate generations
 			// or when we're at the last generation.
 			if model.Generation_i%snapshots_sample_rate == 0 || model.Generation_i == model.Parameters.Generations-1 {
@@ -132,9 +142,9 @@ func (model *Model) run() {
 
 func (model *Model) take_strain_snapshot() {
 	for i := range model.Board_strain {
-		model.Data_Boards.Snapshots[len(model.Data_Boards.Snapshots)-1].Data[i] = append([]int{}, model.Board_strain[i]...)
+		model.Data_samples.Snapshots[len(model.Data_samples.Snapshots)-1].Data[i] = append([]int{}, model.Board_strain[i]...)
 	}
-	model.Data_Boards.Snapshots[len(model.Data_Boards.Snapshots)-1].Generation = model.Generation_i
+	model.Data_samples.Snapshots[len(model.Data_samples.Snapshots)-1].Generation = model.Generation_i
 	//	fmt.Println(model.Board_strain)
 
 	/*	fmt.Println("Snapshots after assignment", model.Data_Boards.Snapshots[0],
@@ -142,8 +152,8 @@ func (model *Model) take_strain_snapshot() {
 		cap(model.Data_Boards.Snapshots))
 	*/
 
-	if len(model.Data_Boards.Snapshots) < cap(model.Data_Boards.Snapshots) {
-		model.Data_Boards.Snapshots = model.Data_Boards.Snapshots[0 : len(model.Data_Boards.Snapshots)+1]
+	if len(model.Data_samples.Snapshots) < cap(model.Data_samples.Snapshots) {
+		model.Data_samples.Snapshots = model.Data_samples.Snapshots[0 : len(model.Data_samples.Snapshots)+1]
 	}
 }
 

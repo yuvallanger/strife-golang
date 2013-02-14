@@ -22,10 +22,10 @@ type Model struct {
 	Board_signal_num Board_signal_num
 	Board_prod       Board_prod
 	Board_pg_num     Board_pg_num
-	Data_Boards      struct {
+	Data_samples     struct {
 		Snapshots             []Snapshot
 		Frequencies           []Frequency
-		Neighbors_Frequencies []Neighbors_Frequency
+		Neighbors_frequencies []Neighbors_frequency
 	}
 	Generation_i int
 	//RandomState      rand.Rand
@@ -48,13 +48,13 @@ type Frequencies struct {
 	Frequency []Frequency
 }
 
-type Neighbors_Frequency struct {
+type Neighbors_frequency struct {
 	Generation int
 	Data       [][]int
 }
 
-type Neighbors_Frequencies struct {
-	Neighbors_Frequency []Neighbors_Frequency
+type Neighbors_frequencies struct {
+	Neighbors_frequency []Neighbors_frequency
 }
 
 type Parameters struct {
@@ -77,10 +77,10 @@ type Parameters struct {
 }
 
 type Settings struct {
-	Data_Filename                string // TODO
-	Snapshots_num                int    // TODO
-	Frequencies_num              int    // TODO
-	Neighborhood_Frequencies_num int    // TODO
+	Data_filename                       string // TODO
+	Snapshots_sample_num                int    // TODO
+	Frequencies_sample_num              int    // TODO
+	Neighborhood_frequencies_sample_num int    // TODO
 }
 
 type Config struct {
@@ -156,19 +156,44 @@ func (board_prod Board_prod) String() (s string) {
 
 func (p Parameters) String() (s string) {
 	s += fmt.Sprintln("Parameters:")
-	s += fmt.Sprintf("Generations                %2v\n", p.Generations)
-	s += fmt.Sprintf("RInitOdds                  %2v\n", p.R_Init_Odds)
-	s += fmt.Sprintf("SInitOdds                  %2v\n", p.S_Init_Odds)
-	s += fmt.Sprintf("STh                        %2v\n", p.Signal_Threshold)
-	s += fmt.Sprintf("CooperationEffectThreshold %2v\n", p.Cooperation_Effect_Threshold)
-	s += fmt.Sprintf("SRad                       %2v\n", p.S_Radius)
-	s += fmt.Sprintf("CRad                       %2v\n", p.PG_Radius)
-	s += fmt.Sprintf("BoardSize                  %2v\n", p.Board_Size)
-	s += fmt.Sprintf("D                          %2v\n", p.D)
-	s += fmt.Sprintf("MutOddsR                   %2v\n", p.Mut_Odds_R)
-	s += fmt.Sprintf("MutOddsS                   %2v\n", p.Mut_Odds_S)
+	s += fmt.Sprintln("Generations")
+	s += fmt.Sprintln("    ", p.Generations)
+	s += fmt.Sprintln("RInitOdds")
+	s += fmt.Sprintln("    ", p.R_Init_Odds)
+	s += fmt.Sprintln("SInitOdds")
+	s += fmt.Sprintln("    ", p.S_Init_Odds)
+	s += fmt.Sprintln("STh")
+	s += fmt.Sprintln("    ", p.Signal_Threshold)
+	s += fmt.Sprintln("CooperationEffectThreshold")
+	s += fmt.Sprintln("    ", p.Cooperation_Effect_Threshold)
+	s += fmt.Sprintln("SRad")
+	s += fmt.Sprintln("    ", p.S_Radius)
+	s += fmt.Sprintln("CRad")
+	s += fmt.Sprintln("    ", p.PG_Radius)
+	s += fmt.Sprintln("BoardSize")
+	s += fmt.Sprintln("    ", p.Board_Size)
+	s += fmt.Sprintln("D")
+	s += fmt.Sprintln("    ", p.D)
+	s += fmt.Sprintln("MutOddsR")
+	s += fmt.Sprintln("    ", p.Mut_Odds_R)
+	s += fmt.Sprintln("MutOddsS")
+	s += fmt.Sprintln("    ", p.Mut_Odds_S)
 	return
 }
+
+func (settings Settings) String() (s string) {
+	s += fmt.Sprintln("Settings:")
+	s += fmt.Sprintln("Data_Filename:")
+	s += fmt.Sprintln("   ", settings.Data_filename)
+	s += fmt.Sprintln("Snapshots_sample_num:")
+	s += fmt.Sprintln("   ", settings.Snapshots_sample_num)
+	s += fmt.Sprintln("Frequencies_sample_num:")
+	s += fmt.Sprintln("   ", settings.Frequencies_sample_num)
+	s += fmt.Sprintln("Neighborhood_Frequencies_sample_num:")
+	s += fmt.Sprintln("   ", settings.Neighborhood_frequencies_sample_num)
+	return
+}
+
 func (model *Model) String() (s string) {
 	s += fmt.Sprintf("model.params:\n%v\n", model.Parameters)
 	s += fmt.Sprintf("%v\n", model.Board_strain)

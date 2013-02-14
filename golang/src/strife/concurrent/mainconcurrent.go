@@ -5,12 +5,13 @@ import (
 	"math/rand"
 	"miscow"
 	"runtime"
+	"strife/flags"
 	"time"
 )
 
 type Coordinate struct{ i, j int }
 
-func Main(cpuprofile *string) {
+func Main(cmdln_flags flags.Flags) {
 	ncpu := runtime.NumCPU()
 	fmt.Printf("previous GOMAXPROCS: %+v; now: %+v\n", runtime.GOMAXPROCS(ncpu), ncpu)
 	fmt.Scanln()

@@ -9,7 +9,7 @@ import (
 )
 
 func (model *Model) Save_snapshots_as_images() {
-	for snapshot_i, snapshot := range model.Data_Boards.Snapshots {
+	for snapshot_i, snapshot := range model.Data_samples.Snapshots {
 		img := board_strain_to_image(&snapshot.Data)
 		imagefile, err := ioutil.TempFile(".", fmt.Sprintf("image-%v-%05d-png-", model.Start_Time, snapshot_i))
 		if err != nil {

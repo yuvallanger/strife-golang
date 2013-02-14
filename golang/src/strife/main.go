@@ -2,31 +2,22 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"log"
 	"strife/concurrent"
+	"strife/flags"
 	"strife/sequential"
 )
 
-var sequentialflag = flag.Bool("sequential", true, "Run sequential model.")
-var concurrentflag = flag.Bool("concur", false, "Run concurrent model.")
-var cpuprofile = flag.String("cpuprofile", "", "Write cpu profile to file.")
-var imagesflag = flag.Bool("images", false, "Output snapshots as images.")
-
 func main() {
+	cmdln_flags := flags.Init_flags()
 	flag.Parse()
-	fmt.Println("Just to let you know, here are some command line flags:")
-	flag.Usage()
 
-	if *concurrentflag && *sequentialflag {
-		flag.Usage()
-		log.Fatalf("Should only use one of the two.")
+	if cmdln_flags.Sequentialflag {
+		sequential.Main(cmdln_flags)
 	}
-	if *sequentialflag {
-		sequential.Main(cpuprofile, imagesflag)
+
+	if cmdln_flags.Concurrentflag {
+		concurrent.Main(cmdln_flags)
 	}
-	if *concurrentflag {
-		concurrent.Main(cpuprofile)
-	}
+
 	flag.Usage()
 }
