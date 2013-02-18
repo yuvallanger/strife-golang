@@ -41,8 +41,15 @@ func (model *CzaranModel) initBoardProd() {
 	center_coord := Coordinate{}
 	for center_coord.r = range model.BoardProd {
 		for center_coord.c = range model.BoardProd[center_coord.r] {
-			if model.CellSignalNum(center_coord, CzaranWt) >= model.Parameters.SignalThreshold {
-				model.SetCellProd(center_coord, true)
+			center_strain := model.CellStrain(center_coord)
+			if 1 == g4strain[center_strain] {
+				if 0 == r4strain[center_strain] {
+					model.SetCellProd(center_coord, true)
+				} else {
+					if model.CellSignalNum(center_coord, CzaranWt) >= model.Parameters.SignalThreshold {
+						model.SetCellProd(center_coord, true)
+					}
+				}
 			}
 		}
 	}
@@ -58,10 +65,10 @@ func (model *CzaranModel) initBoardPGNum() {
 	for center_coord.r = range model.BoardPGNum {
 		for center_coord.c = range model.BoardPGNum[center_coord.r] {
 			rad_coord := Coordinate{}
-			for rad_coord.r = center_coord.r - model.Parameters.PGRadius; rad_coord.r < center_coord.r+model.Parameters.PGRadius+1; rad_coord.r++ {
-				for rad_coord.c = center_coord.c - model.Parameters.PGRadius; rad_coord.c < center_coord.c+model.Parameters.PGRadius+1; rad_coord.c++ {
-					rad_coord_t := rad_coord.ToroidCoordinates(model.Parameters.BoardSize)
-					if model.CellProd(rad_coord_t) {
+			for rad_coord.r = center_coord.r - model.Parameters.PGRadius; rad_coord.r <= center_coord.r+model.Parameters.PGRadius; rad_coord.r++ {
+				for rad_coord.c = center_coord.c - model.Parameters.PGRadius; rad_coord.c <= center_coord.c+model.Parameters.PGRadius; rad_coord.c++ {
+					radCoordToroid := rad_coord.ToroidCoordinates(model.Parameters.BoardSize)
+					if model.CellProd(radCoordToroid) {
 						model.AddToCellPGNum(center_coord, 1)
 					}
 				}
@@ -72,7 +79,7 @@ func (model *CzaranModel) initBoardPGNum() {
 
 func (model *CzaranModel) initBoards() {
 	model.initBoardStrain()
-	model.InitBoardSignalNum()
+	model.InitBoardSignalNum() // that's a *Model method, not a *CzaranModel one, to reduce code duplicity.
 	model.initBoardProd()
 	model.initBoardPGNum()
 }
