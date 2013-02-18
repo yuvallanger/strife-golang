@@ -58,7 +58,7 @@ func (model *AvigdorModel) initBoardPGNum() {
 			rad_coord := Coordinate{}
 			for rad_coord.r = center_coord.r - model.Parameters.PGRadius; rad_coord.r < center_coord.r+model.Parameters.PGRadius+1; rad_coord.r++ {
 				for rad_coord.c = center_coord.c - model.Parameters.PGRadius; rad_coord.c < center_coord.c+model.Parameters.PGRadius+1; rad_coord.c++ {
-					rad_coord_t := rad_coord.toroidCoordinates(model.Parameters.BoardSize)
+					rad_coord_t := rad_coord.ToroidCoordinates(model.Parameters.BoardSize)
 					if model.CellProd(rad_coord_t) {
 						model.AddToCellPGNum(center_coord, 1)
 					}
