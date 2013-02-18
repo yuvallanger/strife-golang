@@ -38,16 +38,16 @@ func (model *CzaranModel) initBoardProd() {
 	}
 
 	// init in the model
-	center_coord := Coordinate{}
-	for center_coord.r = range model.BoardProd {
-		for center_coord.c = range model.BoardProd[center_coord.r] {
-			center_strain := model.CellStrain(center_coord)
-			if 1 == g4strain[center_strain] {
-				if 0 == r4strain[center_strain] {
-					model.SetCellProd(center_coord, true)
+	centerCoord := Coordinate{}
+	for centerCoord.r = range model.BoardProd {
+		for centerCoord.c = range model.BoardProd[centerCoord.r] {
+			centerStrain := model.CellStrain(centerCoord)
+			if 1 == g4strain[centerStrain] {
+				if 0 == r4strain[centerStrain] {
+					model.SetCellProd(centerCoord, true)
 				} else {
-					if model.CellSignalNum(center_coord, CzaranWt) >= model.Parameters.SignalThreshold {
-						model.SetCellProd(center_coord, true)
+					if model.CellSignalNum(centerCoord, CzaranWt) >= model.Parameters.SignalThreshold {
+						model.SetCellProd(centerCoord, true)
 					}
 				}
 			}

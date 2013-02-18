@@ -34,13 +34,13 @@ func (model *AvigdorModel) initBoardProd() {
 	}
 
 	// init in the model
-	center_coord := Coordinate{}
-	for center_coord.r = range model.BoardProd {
-		for center_coord.c = range model.BoardProd[center_coord.r] {
-			strain_at_center_coord := model.CellStrain(center_coord)
-			receptor_allele_at_center_coord := r4strain[strain_at_center_coord]
-			if model.CellSignalNum(center_coord, receptor_allele_at_center_coord) >= model.Parameters.SignalThreshold {
-				model.SetCellProd(center_coord, 1 > 0)
+	centerCoord := Coordinate{}
+	for centerCoord.r = range model.BoardProd {
+		for centerCoord.c = range model.BoardProd[centerCoord.r] {
+			centerStrain := model.CellStrain(centerCoord)
+			centerReceptor := r4strain[centerStrain]
+			if model.CellSignalNum(centerCoord, centerReceptor) >= model.Parameters.SignalThreshold {
+				model.SetCellProd(centerCoord, true)
 			}
 		}
 	}
