@@ -153,45 +153,10 @@ Rotate four (2x2) cells 90 degrees.
 Cells rotate clockwise if "direction" is true and anticlockwise if "direction" is false.
 */
 func (model *CzaranModel) Diffuse(coord00 Coordinate, direction bool) {
-	var before, after [2][2]int
+    coordinates, before, after := model.Rotate90(coord00, direction)
 
-	// We get the coordinates for the four cells we'll rotate.
-	coord11 := Coordinate{r: coord00.r + 1,
-		c: coord00.c + 1}
-	coord11 = coord11.ToroidCoordinates(model.Parameters.BoardSize)
-	coord01 := Coordinate{r: coord00.r,
-		c: coord11.c}
-	coord10 := Coordinate{r: coord11.r,
-		c: coord00.c}
-
-	// Save the tetrade of cells
-	before[0][0] = model.CellStrain(coord00)
-	before[0][1] = model.CellStrain(coord01)
-	before[1][1] = model.CellStrain(coord11)
-	before[1][0] = model.CellStrain(coord10)
-
-	if direction {
-		// true is clockwise
-		after[0][0] = before[1][0]
-		after[0][1] = before[0][0]
-		after[1][1] = before[0][1]
-		after[1][0] = before[1][1]
-	} else {
-		// false is anticlockwise
-		after[0][0] = before[0][1]
-		after[0][1] = before[1][1]
-		after[1][1] = before[1][0]
-		after[1][0] = before[0][0]
-	}
-
-	// Assign the rotated cells
-	model.SetCellStrain(coord00, after[0][0])
-	model.SetCellStrain(coord01, after[0][1])
-	model.SetCellStrain(coord11, after[1][1])
-	model.SetCellStrain(coord10, after[1][0])
-
-	model.UpdateArrays(coord00, after[0][0], before[0][0])
-	model.UpdateArrays(coord01, after[0][1], before[0][1])
-	model.UpdateArrays(coord11, after[1][1], before[1][1])
-	model.UpdateArrays(coord10, after[1][0], before[1][0])
+	model.UpdateArrays(coordinates[0][0], after[0][0], before[0][0])
+	model.UpdateArrays(coordinates[0][1], after[0][1], before[0][1])
+	model.UpdateArrays(coordinates[1][1], after[1][1], before[1][1])
+	model.UpdateArrays(coordinates[1][0], after[1][0], before[1][0])
 }
