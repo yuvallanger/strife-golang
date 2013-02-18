@@ -15,7 +15,7 @@ func (model *AvigdorModel) Fitness(coord Coordinate) float64 {
 	}
 
 	if model.Parameters.CooperationEffectThreshold <= model.CellPGNum(coordToroid) {
-		cost *= model.Parameters.PublicGoodsEffect
+		cost *= (1-model.Parameters.PublicGoodsEffect)
 	}
 
 	return model.Parameters.BasalCost / cost
