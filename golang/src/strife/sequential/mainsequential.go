@@ -3,7 +3,6 @@ package sequential
 
 import (
 	"code.google.com/p/gcfg"
-	"flag"
 	"fmt"
 	"log"
 	"math/rand"
@@ -15,15 +14,17 @@ import (
 
 func load_config(cmdln_flags flags.Flags) (parameters Parameters, settings Settings) {
 	var cfg Config
-	settings_filename := "strife.conf"
+	var settings_filename string
 	if cmdln_flags.Settings_filename_flag != "" {
 		settings_filename = cmdln_flags.Settings_filename_flag
+	} else {
+		settings_filename = "default.conf"
 	}
 	err := gcfg.ReadFileInto(&cfg, settings_filename)
 	if err != nil {
-		log.Panicf("settings file: %+v; error: %+v\n", settings_filename, err)
-		parameters = Default_Parameters
-		settings = Default_Settings
+		log.Printf("settings file: %+v; error: %+v\n", settings_filename, err)
+		parameters = DefaultParameters
+		settings = DefaultSettings
 	} else {
 		parameters = cfg.Parameters
 		settings = cfg.Settings
@@ -31,17 +32,40 @@ func load_config(cmdln_flags flags.Flags) (parameters Parameters, settings Setti
 	return
 }
 
-func (m *Model) get_sample_rate() int {
-	if m.Settings.Snapshots_sample_num != 0 {
-		return m.Parameters.Generations/m.Settings.Snapshots_sample_num + 1
+func (m *Model) get_snapshots_sample_rate() int {
+	if m.Settings.SnapshotsSampleNum != 0 {
+		if m.Parameters.Generations%m.Settings.SnapshotsSampleNum == 0 {
+			return m.Parameters.Generations / m.Settings.SnapshotsSampleNum
+		} else {
+			return m.Parameters.Generations/m.Settings.SnapshotsSampleNum + 1
+		}
 	}
 	return 0
 }
 
-func Main(cmdln_flags flags.Flags) {
-	flag.Parse()
-	fmt.Println(flag.Args())
+func (m *Model) get_frequencies_sample_rate() int {
+	if m.Settings.FrequenciesSampleNum != 0 {
+		if m.Parameters.Generations%m.Settings.FrequenciesSampleNum == 0 {
+			return m.Parameters.Generations / m.Settings.FrequenciesSampleNum
+		} else {
+			return m.Parameters.Generations/m.Settings.FrequenciesSampleNum + 1
+		}
+	}
+	return m.Parameters.Generations
+}
 
+func (m *Model) get_neighbors_frequencies_sample_rate() int {
+	if m.Settings.NeighborhoodFrequenciesSampleNum != 0 {
+		if m.Parameters.Generations%m.Settings.NeighborhoodFrequenciesSampleNum == 0 {
+			return m.Parameters.Generations / m.Settings.NeighborhoodFrequenciesSampleNum
+		} else {
+			return m.Parameters.Generations/m.Settings.NeighborhoodFrequenciesSampleNum + 1
+		}
+	}
+	return m.Parameters.Generations
+}
+
+func Main(cmdln_flags flags.Flags) {
 	if cmdln_flags.Cpuprofileflag != "" {
 		f, err := os.Create(cmdln_flags.Cpuprofileflag)
 		if err != nil {
@@ -52,38 +76,116 @@ func Main(cmdln_flags flags.Flags) {
 	}
 
 	// Reading configuration file
-	model := new(Model)
 	params, settings := load_config(cmdln_flags)
-	fmt.Println(params)
+	fmt.Printf("Parameters:\n%+v\n", params)
 	fmt.Scanln()
-	fmt.Println(settings)
+	fmt.Printf("Settings:\n%+v\n", settings)
 	fmt.Scanln()
-	model.Start_Time = fmt.Sprintf("%v", time.Now().UnixNano())
-	model.Parameters = params
-	model.Settings = settings
-	fmt.Printf("Parameters:\n%+v\n", model.Parameters)
-	fmt.Printf("Settings:\n%+v\n", model.Settings)
 
-	model.init_boards()
-	model.init_data_samples()
+	tstart := time.Now()
 
-	if err := model.save_json(); err != nil {
-		panic(err)
+	// Which simulation model do we want to run?
+	// Decided according to commandline flags.
+	if cmdln_flags.Avigdorflag {
+		model := new(AvigdorModel)
+		model.setStartTime()
+		model.Parameters = params
+		model.Settings = settings
+		model.initBoards()
+		model.initDataSamples()
+		if err := model.save_json(); err != nil {
+			panic(err)
+		}
+
+		// TODO cmdln_flags should be inside model's settings
+		var diffusion_num int = diffusionIterPerGeneration(model.Parameters.D, model.Parameters.BoardSize)
+		fmt.Println("diffusion_num: ", diffusion_num)
+		fmt.Println("model.Parameters.Generations = ", model.Parameters.Generations)
+		fmt.Println("model.Generation_i = ", model.GenerationIdx)
+		for model.GenerationIdx = 0; model.GenerationIdx < model.Parameters.Generations; model.GenerationIdx++ {
+			time_per_iter := time.Now()
+			for competition_i := 0; competition_i < model.Parameters.BoardSize*model.Parameters.BoardSize; competition_i++ {
+				model.Competition()
+			}
+
+			for diffusion_i := 0; diffusion_i < diffusion_num; diffusion_i++ {
+				if rand.Intn(2) == 0 {
+					model.Diffuse(Coordinate{r: rand.Intn(model.Parameters.BoardSize),
+						c: rand.Intn(model.Parameters.BoardSize)},
+						true)
+				} else {
+					model.Diffuse(Coordinate{r: rand.Intn(model.Parameters.BoardSize),
+						c: rand.Intn(model.Parameters.BoardSize)},
+						false)
+				}
+			}
+
+			model.sample()
+
+			if model.GenerationIdx%10 == 0 {
+				model.showtiming(tstart, time.Since(time_per_iter))
+			}
+		}
+		if err := model.save_json(); err != nil {
+			panic(err)
+		}
+		if cmdln_flags.Imagesflag {
+			model.SaveSnapshotsAsImages()
+		}
 	}
 
-	model.run()
+	if cmdln_flags.Czaranflag {
+		model := new(CzaranModel)
+		model.setStartTime()
+		model.Parameters = params
+		model.Settings = settings
+		model.initBoards()
+		model.initDataSamples()
+		if err := model.save_json(); err != nil {
+			panic(err)
+		}
 
-	if err := model.save_json(); err != nil {
-		panic(err)
-	}
-	if cmdln_flags.Imagesflag {
-		model.Save_snapshots_as_images()
+		// TODO cmdln_flags should be inside model's settings
+		var diffusion_num int = diffusionIterPerGeneration(model.Parameters.D, model.Parameters.BoardSize)
+		fmt.Println("diffusion_num: ", diffusion_num)
+		fmt.Println("model.Parameters.Generations = ", model.Parameters.Generations)
+		fmt.Println("model.Generation_i = ", model.GenerationIdx)
+		for model.GenerationIdx = 0; model.GenerationIdx < model.Parameters.Generations; model.GenerationIdx++ {
+			time_per_iter := time.Now()
+			for competition_i := 0; competition_i < model.Parameters.BoardSize*model.Parameters.BoardSize; competition_i++ {
+				model.Competition()
+			}
+
+			for diffusion_i := 0; diffusion_i < diffusion_num; diffusion_i++ {
+				if rand.Intn(2) == 0 {
+					model.Diffuse(Coordinate{r: rand.Intn(model.Parameters.BoardSize),
+						c: rand.Intn(model.Parameters.BoardSize)},
+						true)
+				} else {
+					model.Diffuse(Coordinate{r: rand.Intn(model.Parameters.BoardSize),
+						c: rand.Intn(model.Parameters.BoardSize)},
+						false)
+				}
+			}
+
+			model.sample()
+
+			if model.GenerationIdx%10 == 0 {
+				model.showtiming(tstart, time.Since(time_per_iter))
+			}
+		}
+		if err := model.save_json(); err != nil {
+			panic(err)
+		}
+		if cmdln_flags.Imagesflag {
+			model.SaveSnapshotsAsImages()
+		}
 	}
 
 }
 
-func (model *Model) get_diffusion_iter_per_generation() int {
-	return int(model.Parameters.D * float64(model.Parameters.Board_Size*model.Parameters.Board_Size) / 4)
+func diffusionIterPerGeneration(d float64, boardSize int) int {
+	return int(d * float64(boardSize*boardSize) / 4)
 }
 
 func (model *Model) showboards() {
@@ -98,69 +200,102 @@ func (model *Model) showboards() {
 		fmt.Scanln()
 	*/
 }
-func (model *Model) run() {
-	var snapshots_sample_rate int = model.get_sample_rate()
-	var diffusion_num int = model.get_diffusion_iter_per_generation()
-	fmt.Println("diffusion_num: ", diffusion_num)
-	fmt.Println("model.Parameters.Generations = ", model.Parameters.Generations)
-	fmt.Println("model.Generation_i = ", model.Generation_i)
-	tstart := time.Now()
 
-	for model.Generation_i = 0; model.Generation_i < model.Parameters.Generations; model.Generation_i++ {
-		time_per_iter := time.Now()
-		model.showboards()
-		for competition_i := 0; competition_i < model.Parameters.Board_Size*model.Parameters.Board_Size; competition_i++ {
-			model.avigdor_competition()
+// TODO maybe remove this when you're over?
+func buga() {
+	fmt.Println("buga")
+	fmt.Println("buga")
+	fmt.Println("buga")
+	fmt.Println("buga")
+	fmt.Println("buga")
+	fmt.Println("buga")
+}
+
+func run(model Simulation, cmdln_flags flags.Flags) {
+}
+
+func (model *Model) sample() {
+	var snapshots_sample_rate int = model.get_snapshots_sample_rate()
+	var frequencies_sample_rate int = model.get_frequencies_sample_rate()
+	var neighbors_frequencies_sample_rate int = model.get_neighbors_frequencies_sample_rate()
+	// take a sample only if we were asked to.
+	if model.Settings.SnapshotsSampleNum != 0 {
+		// take sample only every snapshots_sample_rate generations
+		// or when we're at the last generation.
+		if model.GenerationIdx%snapshots_sample_rate == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
+			model.take_board_sample()
 		}
-		model.showboards()
+	}
 
-		for diffusion_i := 0; diffusion_i < diffusion_num; diffusion_i++ {
-			if rand.Intn(2) == 0 {
-				model.diffuse(Coordinate{r: rand.Intn(model.Parameters.Board_Size),
-					c: rand.Intn(model.Parameters.Board_Size)},
-					true)
-			} else {
-				model.diffuse(Coordinate{r: rand.Intn(model.Parameters.Board_Size),
-					c: rand.Intn(model.Parameters.Board_Size)},
-					false)
-			}
+	// take a sample only if we were asked to.
+	if model.Settings.FrequenciesSampleNum != 0 {
+		// take sample only every frequencies_sample_rate generations
+		// or when we're at the last generation.
+		if model.GenerationIdx%frequencies_sample_rate == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
+			model.take_frequencies_sample()
 		}
-		model.showboards()
-
-		model.showtiming(tstart, time.Since(time_per_iter))
-
-		// take a snapshot only if we were asked to.
-		if model.Settings.Snapshots_sample_num != 0 {
-			// take snapshot only every snapshots_sample_rate generations
-			// or when we're at the last generation.
-			if model.Generation_i%snapshots_sample_rate == 0 || model.Generation_i == model.Parameters.Generations-1 {
-				model.take_strain_snapshot()
-			}
+	}
+	// take a sample only if we were asked to.
+	if model.Settings.SnapshotsSampleNum != 0 {
+		// take sample only every neighbors_frequencies_sample_rate generations
+		// or when we're at the last generation.
+		if model.GenerationIdx%neighbors_frequencies_sample_rate == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
+			model.take_neighbors_frequencies_sample()
 		}
 	}
 }
 
-func (model *Model) take_strain_snapshot() {
-	for i := range model.Board_strain {
-		model.Data_samples.Snapshots[len(model.Data_samples.Snapshots)-1].Data[i] = append([]int{}, model.Board_strain[i]...)
+func (model *Model) take_board_sample() {
+	for i := range model.BoardStrain {
+		model.DataSamples.Snapshots[len(model.DataSamples.Snapshots)-1].Data[i] = append([]int{}, model.BoardStrain[i]...)
 	}
-	model.Data_samples.Snapshots[len(model.Data_samples.Snapshots)-1].Generation = model.Generation_i
-	//	fmt.Println(model.Board_strain)
 
-	/*	fmt.Println("Snapshots after assignment", model.Data_Boards.Snapshots[0],
-		len(model.Data_Boards.Snapshots),
-		cap(model.Data_Boards.Snapshots))
-	*/
+	model.DataSamples.Snapshots[len(model.DataSamples.Snapshots)-1].Generation = model.GenerationIdx
 
-	if len(model.Data_samples.Snapshots) < cap(model.Data_samples.Snapshots) {
-		model.Data_samples.Snapshots = model.Data_samples.Snapshots[0 : len(model.Data_samples.Snapshots)+1]
+	if len(model.DataSamples.Snapshots) < cap(model.DataSamples.Snapshots) {
+		model.DataSamples.Snapshots = model.DataSamples.Snapshots[0 : len(model.DataSamples.Snapshots)+1]
+	}
+}
+
+func (model *Model) take_frequencies_sample() {
+	coord := Coordinate{}
+	for coord.r = 0; coord.r < model.Parameters.BoardSize; coord.r++ {
+		for coord.c = 0; coord.c < model.Parameters.BoardSize; coord.c++ {
+			model.DataSamples.Frequencies[len(model.DataSamples.Frequencies)-1].Data[model.CellStrain(coord)]++
+		}
+	}
+
+	model.DataSamples.Frequencies[len(model.DataSamples.Frequencies)-1].Generation = model.GenerationIdx
+
+	if len(model.DataSamples.Frequencies) < cap(model.DataSamples.Frequencies) {
+		model.DataSamples.Frequencies = model.DataSamples.Frequencies[0 : len(model.DataSamples.Frequencies)+1]
+	}
+}
+
+func (model *Model) take_neighbors_frequencies_sample() {
+	center_coord := Coordinate{}
+	for center_coord.r = 0; center_coord.r < model.Parameters.BoardSize; center_coord.r++ {
+		for center_coord.c = 0; center_coord.c < model.Parameters.BoardSize; center_coord.c++ {
+			rad_coord := Coordinate{}
+			for rad_coord.r = center_coord.r - 1; rad_coord.r < center_coord.r+1; rad_coord.r++ {
+				for rad_coord.c = center_coord.r - 1; rad_coord.c < center_coord.r+1; rad_coord.c++ {
+					model.DataSamples.NeighborsFrequencies[len(model.DataSamples.NeighborsFrequencies)-1].Data[model.CellStrain(center_coord)][model.CellStrain(rad_coord.ToroidCoordinates(model.Parameters.BoardSize))]++
+				}
+			}
+		}
+	}
+
+	model.DataSamples.NeighborsFrequencies[len(model.DataSamples.NeighborsFrequencies)-1].Generation = model.GenerationIdx
+
+	if len(model.DataSamples.NeighborsFrequencies) < cap(model.DataSamples.NeighborsFrequencies) {
+		model.DataSamples.NeighborsFrequencies = model.DataSamples.NeighborsFrequencies[0 : len(model.DataSamples.NeighborsFrequencies)+1]
 	}
 }
 
 func (model *Model) showtiming(t_start time.Time, dt_iter time.Duration) {
 	t_elapsed := time.Now().Sub(t_start)
 	dt_tot_runtime := time.Duration(dt_iter.Nanoseconds()*int64(model.Parameters.Generations)) * time.Nanosecond
-	dt_tot_runtime_300_10000 := time.Duration(dt_iter.Nanoseconds()*10000*300*300/int64(model.Parameters.Board_Size*model.Parameters.Board_Size)) * time.Nanosecond
+	dt_tot_runtime_300_10000 := time.Duration(dt_iter.Nanoseconds()*10000*300*300/int64(model.Parameters.BoardSize*model.Parameters.BoardSize)) * time.Nanosecond
 
 	t_finish := t_start.Add(dt_tot_runtime)
 
