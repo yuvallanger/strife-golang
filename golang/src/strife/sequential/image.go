@@ -8,10 +8,10 @@ import (
 	"io/ioutil"
 )
 
-func (model *Model) Save_snapshots_as_images() {
-	for snapshot_i, snapshot := range model.Data_samples.Snapshots {
+func (model *Model) SaveSnapshotsAsImages() {
+	for snapshot_i, snapshot := range model.DataSamples.Snapshots {
 		img := board_strain_to_image(&snapshot.Data)
-		imagefile, err := ioutil.TempFile(".", fmt.Sprintf("image-%v-%05d-png-", model.Start_Time, snapshot_i))
+		imagefile, err := ioutil.TempFile(".", fmt.Sprintf("image-%v-%05d-png-", model.StartTime, snapshot_i))
 		if err != nil {
 			panic(err)
 		}
@@ -20,13 +20,13 @@ func (model *Model) Save_snapshots_as_images() {
 	}
 }
 
-func board_strain_to_image(board_strain *Board_strain) (img *image.RGBA) {
+func board_strain_to_image(boardStrain *BoardStrain) (img *image.RGBA) {
 	img = image.NewRGBA(image.Rect(0,
 		0,
-		len(*board_strain),
-		len(*board_strain)))
-	for row := range *board_strain {
-		for col, strain := range (*board_strain)[row] {
+		len(*boardStrain),
+		len(*boardStrain)))
+	for row := range *boardStrain {
+		for col, strain := range (*boardStrain)[row] {
 			img.Set(row, col, color.RGBA{
 				uint8(255 * r4strain[strain]),
 				uint8(255 * s4strain[strain]),

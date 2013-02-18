@@ -5,7 +5,11 @@ import (
 	"miscow"
 )
 
-func rand_neighbor(coord Coordinate, board_size int) (coord2 Coordinate) {
+func StrainSpec(r, s, g int) int {
+	return r + s*2 + g*4
+}
+
+func RandNeighbor(coord Coordinate, board_size int) (coord2 Coordinate) {
 	switch direction := rand.Intn(4); direction {
 	case 0:
 		return Coordinate{r: coord.r,

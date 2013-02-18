@@ -8,7 +8,7 @@ import (
 func (model *CzaranModel) Fitness(coord Coordinate) float64 {
 	var cost float64 = model.Parameters.BasalCost
 
-	coordToroid := coord.toroidCoordinates(model.Parameters.BoardSize)
+	coordToroid := coord.ToroidCoordinates(model.Parameters.BoardSize)
 
 	strain := model.CellStrain(coordToroid)
 
@@ -64,7 +64,7 @@ func (model *CzaranModel) UpdateArrays(coord Coordinate, newstrain, oldstrain in
 
 	for signalCoord.r = coord.r - model.Parameters.SRadius; signalCoord.r <= coord.r+model.Parameters.SRadius; signalCoord.r++ {
 		for signalCoord.c = coord.c - model.Parameters.SRadius; signalCoord.c <= coord.c+model.Parameters.SRadius; signalCoord.c++ {
-			signalCoordTorus = signalCoord.toroidCoordinates(model.Parameters.BoardSize)
+			signalCoordTorus = signalCoord.ToroidCoordinates(model.Parameters.BoardSize)
 
 			// update signal level in sig range
 			model.AddToCellSignalNum(signalCoordTorus, s4strain[oldstrain], -1)
@@ -94,7 +94,7 @@ func (model *CzaranModel) UpdateArrays(coord Coordinate, newstrain, oldstrain in
 			if oldProd != model.CellProd(signalCoordTorus) {
 				for PGCoord.r = signalCoord.r - model.Parameters.PGRadius; PGCoord.r <= signalCoord.r+model.Parameters.PGRadius; PGCoord.r++ {
 					for PGCoord.c = signalCoord.c - model.Parameters.PGRadius; PGCoord.c <= signalCoord.c+model.Parameters.PGRadius; PGCoord.c++ {
-						PGCoordTorus = PGCoord.toroidCoordinates(model.Parameters.BoardSize)
+						PGCoordTorus = PGCoord.ToroidCoordinates(model.Parameters.BoardSize)
 
 						// We change PG level at signalCoord's neighbors
 						if model.CellProd(signalCoordTorus) {
@@ -158,7 +158,7 @@ func (model *CzaranModel) Diffuse(coord00 Coordinate, direction bool) {
 	// We get the coordinates for the four cells we'll rotate.
 	coord11 := Coordinate{r: coord00.r + 1,
 		c: coord00.c + 1}
-    coord11 = coord11.ToroidCoordinates(model.Parameters.BoardSize)
+	coord11 = coord11.ToroidCoordinates(model.Parameters.BoardSize)
 	coord01 := Coordinate{r: coord00.r,
 		c: coord11.c}
 	coord10 := Coordinate{r: coord11.r,

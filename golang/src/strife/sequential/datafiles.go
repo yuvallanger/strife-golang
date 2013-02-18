@@ -41,7 +41,7 @@ func (model *Model) save_json() error {
 		log.Panicln(err)
 	}
 	file, err := ioutil.TempFile(".",
-		fmt.Sprintf("%v-%v-%v-", model.Settings.Data_filename, model.Start_Time, model.Generation_i))
+		fmt.Sprintf("%v-%v-%v-", model.Settings.DataFilename, model.StartTime, model.GenerationIdx))
 	if err != nil {
 		log.Panicln(err)
 	}
