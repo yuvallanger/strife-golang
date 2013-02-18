@@ -23,18 +23,12 @@ func (model *CzaranModel) initBoardStrain() {
 			if rand.Float64() < model.Parameters.GInitOdds {
 				model.BoardStrain[row_i][col_i] += 4
 			}
-
 		}
 	}
 }
 
-const czaran_R_wt = 1
-const czaran_S_wt = 1
-const czaran_G_wt = 1
-
-const czaran_R_mut = 0
-const czaran_S_mut = 0
-const czaran_G_mut = 0
+const CzaranWt = 1
+const CzaranMut = 0
 
 func (model *CzaranModel) initBoardProd() {
 	// init on the metal
@@ -47,7 +41,7 @@ func (model *CzaranModel) initBoardProd() {
 	center_coord := Coordinate{}
 	for center_coord.r = range model.BoardProd {
 		for center_coord.c = range model.BoardProd[center_coord.r] {
-			if model.CellSignalNum(center_coord, czaran_S_wt) >= model.Parameters.SignalThreshold {
+			if model.CellSignalNum(center_coord, CzaranWt) >= model.Parameters.SignalThreshold {
 				model.SetCellProd(center_coord, true)
 			}
 		}

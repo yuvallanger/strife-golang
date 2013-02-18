@@ -4,6 +4,7 @@ var DefaultParameters = Parameters{
 	Generations:                10,
 	RInitOdds:                  0,
 	SInitOdds:                  0,
+	GInitOdds:                  0,
 	SignalThreshold:            3,
 	CooperationEffectThreshold: 3,
 	SRadius:                    1,
