@@ -2,45 +2,59 @@ package sequential
 
 import (
 	"math/rand"
-	"miscow"
 )
 
-func (model *CzaranModel) fitness(coord Coordinate) float64 {
-	// computes the fitness of a given cell
+// Compute the Czaran fitness of the cell at the specified Coordinate
+func (model *CzaranModel) Fitness(coord Coordinate) float64 {
 	var cost float64 = model.Parameters.BasalCost
 
 	coordToroid := coord.toroidCoordinates(model.Parameters.BoardSize)
 
-	if model.cellProd(coordToroid) {
+	strain := model.CellStrain(coordToroid)
+
+	// If the cell produces receptor, add cost of receptor production
+	if 1 == r4strain[strain] {
+		cost += model.Parameters.ReceptorCost
+	}
+
+	// If the cell produces signal, add cost of signal production
+	if 1 == s4strain[strain] {
+		cost += model.Parameters.SignalCost
+	}
+
+	// If there's public goods production, add cost of cooperation
+	if model.CellProd(coordToroid) {
 		cost += model.Parameters.CooperationCost
 	}
 
-	if model.Parameters.CooperationEffectThreshold <= model.cellPGNum(coordToroid) {
+	if model.Parameters.CooperationEffectThreshold <= model.CellPGNum(coordToroid) {
 		cost *= model.Parameters.PublicGoodsEffect
 	}
 
 	return model.Parameters.BasalCost / cost
-
 }
 
-func (model *CzaranModel) mutate(coord Coordinate) int {
-	var r, s int
-	var strain int = model.getCellStrain(coord)
-
-	r = r4strain[strain]
+// Mutate the provided strain
+func (model *CzaranModel) Mutate(strain int) int {
+	r := r4strain[strain]
 	if rand.Float64() < model.Parameters.MutOddsR {
 		r = 1 - r
 	}
 
-	s = s4strain[strain]
+	s := s4strain[strain]
 	if rand.Float64() < model.Parameters.MutOddsS {
 		s = 1 - s
 	}
 
-	return strainSpec(r, s, 1) // in Avigdor's model, the public goods allele is always functional (but not always expressed).
+	g := g4strain[strain]
+	if rand.Float64() < model.Parameters.MutOddsG {
+		g = 1 - g
+	}
+
+	return StrainSpec(r, s, g)
 }
 
-func (model *CzaranModel) updateArrays(coord Coordinate, newstrain, oldstrain int) {
+func (model *CzaranModel) UpdateArrays(coord Coordinate, newstrain, oldstrain int) {
 	var (
 		neighborStrain                int
 		signalCoord, signalCoordTorus Coordinate
@@ -53,40 +67,40 @@ func (model *CzaranModel) updateArrays(coord Coordinate, newstrain, oldstrain in
 			signalCoordTorus = signalCoord.toroidCoordinates(model.Parameters.BoardSize)
 
 			// update signal level in sig range
-			model.addToCellSignalNum(signalCoordTorus, s4strain[oldstrain], -1)
-			model.addToCellSignalNum(signalCoordTorus, s4strain[newstrain], 1)
+			model.AddToCellSignalNum(signalCoordTorus, s4strain[oldstrain], -1)
+			model.AddToCellSignalNum(signalCoordTorus, s4strain[newstrain], 1)
 
-			oldProd = model.cellProd(signalCoordTorus)
-			neighborStrain = model.getCellStrain(signalCoordTorus)
+			oldProd = model.CellProd(signalCoordTorus)
+			neighborStrain = model.CellStrain(signalCoordTorus)
 			// update producer status at signalCoordTorus
 			// Production is active if cell has a working PG gene and:
 			//     The receptor allele is malfunctioned. OR
 			//     The receptor allele is working and the signal level is above threshold.
 			if g4strain[neighborStrain] == 1 {
 				if r4strain[neighborStrain] == 1 {
-					if model.Parameters.SignalThreshold <= model.cellSignalNum(signalCoordTorus, 1) {
-						model.setCellProd(signalCoordTorus, true)
+					if model.Parameters.SignalThreshold <= model.CellSignalNum(signalCoordTorus, 1) {
+						model.SetCellProd(signalCoordTorus, true)
 					} else {
-						model.setCellProd(signalCoordTorus, false)
+						model.SetCellProd(signalCoordTorus, false)
 					}
 				} else {
-					model.setCellProd(signalCoordTorus, true)
+					model.SetCellProd(signalCoordTorus, true)
 				}
 			} else {
-				model.setCellProd(signalCoordTorus, false)
+				model.SetCellProd(signalCoordTorus, false)
 			}
 
 			// update PG levels around signalCoord
-			if oldProd != model.cellProd(signalCoordTorus) {
+			if oldProd != model.CellProd(signalCoordTorus) {
 				for PGCoord.r = signalCoord.r - model.Parameters.PGRadius; PGCoord.r <= signalCoord.r+model.Parameters.PGRadius; PGCoord.r++ {
 					for PGCoord.c = signalCoord.c - model.Parameters.PGRadius; PGCoord.c <= signalCoord.c+model.Parameters.PGRadius; PGCoord.c++ {
 						PGCoordTorus = PGCoord.toroidCoordinates(model.Parameters.BoardSize)
 
 						// We change PG level at signalCoord's neighbors
-						if model.cellProd(signalCoordTorus) {
-							model.addToCellPGNum(PGCoordTorus, 1)
+						if model.CellProd(signalCoordTorus) {
+							model.AddToCellPGNum(PGCoordTorus, 1)
 						} else {
-							model.addToCellPGNum(PGCoordTorus, -1)
+							model.AddToCellPGNum(PGCoordTorus, -1)
 						}
 					}
 				}
@@ -96,83 +110,88 @@ func (model *CzaranModel) updateArrays(coord Coordinate, newstrain, oldstrain in
 }
 
 /*
-Endgame copies the winning cell into the losing one's position.
-Before the cell is copied, we pass it through mutate().
+Endgame() copies the winning cell into the losing one's position.
+Before the winning cell is copied, we mutate it using Mutate().
 */
-func (model *CzaranModel) endgame(winnerCoord, loserCoord Coordinate) {
-	newstrain := model.mutate(winnerCoord)
-	oldstrain := model.getCellStrain(loserCoord)
+func (model *CzaranModel) Endgame(winnerCoord, loserCoord Coordinate) {
+	newstrain := model.Mutate(model.CellStrain(winnerCoord))
+	oldstrain := model.CellStrain(loserCoord)
 	if newstrain != oldstrain {
-		model.setCellStrain(loserCoord, newstrain)
-		model.updateArrays(loserCoord, newstrain, oldstrain)
+		model.SetCellStrain(loserCoord, newstrain)
+		model.UpdateArrays(loserCoord, newstrain, oldstrain)
 	}
 }
 
-func (model *CzaranModel) competition() {
+/*
+Competition() takes two adjacent cells, decides who wins, copies the winner,
+    mutates it and replaces the losing cell with the mutated copy.
+*/
+func (model *CzaranModel) Competition() {
 
 	var c1, c2 Coordinate
-	c1 = randCoord(model.Parameters.BoardSize)
-	c2 = randNeighbor(c1, model.Parameters.BoardSize)
+	c1 = RandCoord(model.Parameters.BoardSize)
+	c2 = RandNeighbor(c1, model.Parameters.BoardSize)
 
-	fitness_1 := model.fitness(c1)
-	fitness_2 := model.fitness(c2)
+	fitness_1 := model.Fitness(c1)
+	fitness_2 := model.Fitness(c2)
 
 	// Randomize fo shizzles
 	score := rand.Float64()*fitness_1 - rand.Float64()*fitness_2
 
 	if score > 0 {
 		// cell 1 wins
-		model.endgame(c1, c2)
+		model.Endgame(c1, c2)
 	} else {
 		// cell 2 wins
-		model.endgame(c2, c1)
+		model.Endgame(c2, c1)
 	}
 }
 
 /*
-Takes a model and turns four cells 90 degrees
+Rotate four (2x2) cells 90 degrees.
+
+Cells rotate clockwise if "direction" is true and anticlockwise if "direction" is false.
 */
-func (model *CzaranModel) diffuse(coord00 Coordinate, direction bool) {
-	// at each whirl, 4 cells are moved
-	//var r0, c0, r1, c1 int
+func (model *CzaranModel) Diffuse(coord00 Coordinate, direction bool) {
 	var before, after [2][2]int
 
-	// We get the coordinates for the four cells we'll turn.'
-	coord11 := Coordinate{r: miscow.MyMod(coord00.r+1, model.Parameters.BoardSize),
-		c: miscow.MyMod(coord00.c+1, model.Parameters.BoardSize)}
-	coord01 := coord00
-	coord01.c = coord11.c
-	coord10 := coord00
-	coord10.c = coord11.r
+	// We get the coordinates for the four cells we'll rotate.
+	coord11 := Coordinate{r: coord00.r + 1,
+		c: coord00.c + 1}
+    coord11 = coord11.ToroidCoordinates(model.Parameters.BoardSize)
+	coord01 := Coordinate{r: coord00.r,
+		c: coord11.c}
+	coord10 := Coordinate{r: coord11.r,
+		c: coord00.c}
 
-	// Save the tetrades
-	before[0][0] = model.getCellStrain(coord00)
-	before[0][1] = model.getCellStrain(coord01)
-	before[1][0] = model.getCellStrain(coord10)
-	before[1][1] = model.getCellStrain(coord11)
+	// Save the tetrade of cells
+	before[0][0] = model.CellStrain(coord00)
+	before[0][1] = model.CellStrain(coord01)
+	before[1][1] = model.CellStrain(coord11)
+	before[1][0] = model.CellStrain(coord10)
 
 	if direction {
 		// true is clockwise
 		after[0][0] = before[1][0]
 		after[0][1] = before[0][0]
-		after[1][0] = before[1][1]
 		after[1][1] = before[0][1]
+		after[1][0] = before[1][1]
 	} else {
 		// false is anticlockwise
 		after[0][0] = before[0][1]
 		after[0][1] = before[1][1]
-		after[1][0] = before[0][0]
 		after[1][1] = before[1][0]
+		after[1][0] = before[0][0]
 	}
 
 	// Assign the rotated cells
-	model.setCellStrain(coord00, after[0][0])
-	model.setCellStrain(coord01, after[0][1])
-	model.setCellStrain(coord10, after[1][0])
-	model.setCellStrain(coord11, after[1][1])
+	model.SetCellStrain(coord00, after[0][0])
+	model.SetCellStrain(coord01, after[0][1])
+	model.SetCellStrain(coord11, after[1][1])
+	model.SetCellStrain(coord10, after[1][0])
 
-	model.updateArrays(coord00, after[0][0], before[0][0])
-	model.updateArrays(coord01, after[0][1], before[0][1])
-	model.updateArrays(coord10, after[1][0], before[1][0])
-	model.updateArrays(coord11, after[1][1], before[1][1])
+	model.UpdateArrays(coord00, after[0][0], before[0][0])
+	model.UpdateArrays(coord01, after[0][1], before[0][1])
+	model.UpdateArrays(coord11, after[1][1], before[1][1])
+	model.UpdateArrays(coord10, after[1][0], before[1][0])
 }
