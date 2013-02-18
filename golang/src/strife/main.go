@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"strife/concurrent"
 	"strife/flags"
 	"strife/sequential"
@@ -9,7 +10,7 @@ import (
 
 func main() {
 	cmdln_flags := flags.Init_flags()
-	flag.Parse()
+	fmt.Printf("%+v\n", cmdln_flags)
 
 	if cmdln_flags.Sequentialflag {
 		sequential.Main(cmdln_flags)
