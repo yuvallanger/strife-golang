@@ -32,34 +32,23 @@ func load_config(cmdln_flags flags.Flags) (parameters Parameters, settings Setti
 	return
 }
 
-func (m *Model) get_snapshots_sample_rate() int {
-	if m.Settings.SnapshotsSampleNum != 0 {
-		if m.Parameters.Generations%m.Settings.SnapshotsSampleNum == 0 {
-			return m.Parameters.Generations / m.Settings.SnapshotsSampleNum
+func (model *Model) Snapshots_sample_rate() int {
+	if model.Settings.SnapshotsSampleNum != 0 {
+		if model.Parameters.Generations%model.Settings.SnapshotsSampleNum == 0 {
+			return model.Parameters.Generations / model.Settings.SnapshotsSampleNum
 		} else {
-			return m.Parameters.Generations/m.Settings.SnapshotsSampleNum + 1
+			return model.Parameters.Generations/model.Settings.SnapshotsSampleNum + 1
 		}
 	}
 	return model.Parameters.Generations
 }
 
-func (m *Model) get_frequencies_sample_rate() int {
+func (m *Model) Frequencies_sample_rate() int {
 	if m.Settings.FrequenciesSampleNum != 0 {
 		if m.Parameters.Generations%m.Settings.FrequenciesSampleNum == 0 {
 			return m.Parameters.Generations / m.Settings.FrequenciesSampleNum
 		} else {
 			return m.Parameters.Generations/m.Settings.FrequenciesSampleNum + 1
-		}
-	}
-	return m.Parameters.Generations
-}
-
-func (m *Model) get_neighbors_frequencies_sample_rate() int {
-	if m.Settings.NeighborhoodFrequenciesSampleNum != 0 {
-		if m.Parameters.Generations%m.Settings.NeighborhoodFrequenciesSampleNum == 0 {
-			return m.Parameters.Generations / m.Settings.NeighborhoodFrequenciesSampleNum
-		} else {
-			return m.Parameters.Generations/m.Settings.NeighborhoodFrequenciesSampleNum + 1
 		}
 	}
 	return m.Parameters.Generations
@@ -217,9 +206,8 @@ func run(model Simulation, cmdln_flags flags.Flags) {
 }
 
 func (model *Model) sample() {
-	var snapshots_sample_rate int = model.get_snapshots_sample_rate()
-	var frequencies_sample_rate int = model.get_frequencies_sample_rate()
-	var neighbors_frequencies_sample_rate int = model.get_neighbors_frequencies_sample_rate()
+	var snapshots_sample_rate int = model.Snapshots_sample_rate()
+	var frequencies_sample_rate int = model.Frequencies_sample_rate()
 	// take a sample only if we were asked to.
 	if model.Settings.SnapshotsSampleNum != 0 {
 		// take sample only every snapshots_sample_rate generations
@@ -235,13 +223,6 @@ func (model *Model) sample() {
 		// or when we're at the last generation.
 		if model.GenerationIdx%frequencies_sample_rate == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
 			model.take_frequencies_sample()
-		}
-	}
-	// take a sample only if we were asked to.
-	if model.Settings.SnapshotsSampleNum != 0 {
-		// take sample only every neighbors_frequencies_sample_rate generations
-		// or when we're at the last generation.
-		if model.GenerationIdx%neighbors_frequencies_sample_rate == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
 			model.take_neighbors_frequencies_sample()
 		}
 	}
@@ -298,11 +279,16 @@ func (model *Model) showtiming(t_start time.Time, dt_iter time.Duration) {
 	t_elapsed := time.Now().Sub(t_start)
 	dt_tot_runtime := time.Duration(dt_iter.Nanoseconds()*int64(model.Parameters.Generations)) * time.Nanosecond
 	dt_tot_runtime_300_10000 := time.Duration(dt_iter.Nanoseconds()*10000*300*300/int64(model.Parameters.BoardSize*model.Parameters.BoardSize)) * time.Nanosecond
+	dt_eta := time.Duration(dt_iter.Nanoseconds() * int64(model.Parameters.Generations - model.GenerationIdx)) * time.Nanosecond
+	dt_eta_300_10000 := time.Duration(dt_iter.Nanoseconds() * int64(model.Parameters.Generations - model.GenerationIdx) * 10000 * 300 * 300 / int64(model.Parameters.BoardSize*model.Parameters.BoardSize)) * time.Nanosecond
 
 	t_finish := t_start.Add(dt_tot_runtime)
 
 	fmt.Println("Since start:", t_elapsed)
+    fmt.Printf("Generation (%v tot): %v\n", model.Parameters.Generations, model.GenerationIdx)
 	fmt.Println("Expected total run time:", dt_tot_runtime)
+	fmt.Println("Time to finish:", dt_eta)
 	fmt.Println("Expected total run time (10k gen, 300^2 board):", dt_tot_runtime_300_10000)
+	fmt.Println("Time to finish (10k gen, 300^2 board):", dt_eta_300_10000)
 	fmt.Println("Finish time:", t_finish)
 }

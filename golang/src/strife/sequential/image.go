@@ -24,7 +24,7 @@ func board_strain_to_image(boardStrain *BoardStrain) (img *image.RGBA) {
 	img = image.NewRGBA(image.Rect(0,
 		0,
 		len(*boardStrain),
-		len(*boardStrain)))
+		len((*boardStrain)[0])))
 	for row := range *boardStrain {
 		for col, strain := range (*boardStrain)[row] {
 			img.Set(row, col, color.RGBA{
