@@ -32,7 +32,7 @@ func load_config(cmdln_flags flags.Flags) (parameters Parameters, settings Setti
 	return
 }
 
-func (model *Model) Snapshots_sample_rate() int {
+func (model *Model) SnapshotsSampleRate() int {
 	if model.Settings.SnapshotsSampleNum != 0 {
 		if model.Parameters.Generations%model.Settings.SnapshotsSampleNum == 0 {
 			return model.Parameters.Generations / model.Settings.SnapshotsSampleNum
@@ -43,7 +43,7 @@ func (model *Model) Snapshots_sample_rate() int {
 	return model.Parameters.Generations
 }
 
-func (m *Model) Frequencies_sample_rate() int {
+func (m *Model) FrequenciesSampleRate() int {
 	if m.Settings.FrequenciesSampleNum != 0 {
 		if m.Parameters.Generations%m.Settings.FrequenciesSampleNum == 0 {
 			return m.Parameters.Generations / m.Settings.FrequenciesSampleNum
@@ -206,13 +206,13 @@ func run(model Simulation, cmdln_flags flags.Flags) {
 }
 
 func (model *Model) sample() {
-	var snapshots_sample_rate int = model.Snapshots_sample_rate()
-	var frequencies_sample_rate int = model.Frequencies_sample_rate()
+	var snapshotsSampleRate int = model.SnapshotsSampleRate()
+	var frequenciesSampleRate int = model.FrequenciesSampleRate()
 	// take a sample only if we were asked to.
 	if model.Settings.SnapshotsSampleNum != 0 {
 		// take sample only every snapshots_sample_rate generations
 		// or when we're at the last generation.
-		if model.GenerationIdx%snapshots_sample_rate == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
+		if model.GenerationIdx%snapshotsSampleRate == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
 			model.take_board_sample()
 		}
 	}
@@ -221,7 +221,7 @@ func (model *Model) sample() {
 	if model.Settings.FrequenciesSampleNum != 0 {
 		// take sample only every frequencies_sample_rate generations
 		// or when we're at the last generation.
-		if model.GenerationIdx%frequencies_sample_rate == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
+		if model.GenerationIdx%frequenciesSampleRate == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
 			model.take_frequencies_sample()
 			model.take_neighbors_frequencies_sample()
 		}
