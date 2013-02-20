@@ -83,13 +83,13 @@ func (model *Model) initDataSamplesFrequencies() {
 
 // Initialize the neighbors frequencies samples
 func (model *Model) initDataSamplesNeighborhoodFrequencies() {
-	if model.Settings.NeighborhoodFrequenciesSampleNum != 0 {
-		if model.Parameters.Generations%model.Settings.NeighborhoodFrequenciesSampleNum == 0 {
+	if model.Settings.FrequenciesSampleNum != 0 {
+		if model.Parameters.Generations%model.Settings.FrequenciesSampleNum == 0 {
 			// the case in which the last sample is the same as the last generation
-			model.DataSamples.NeighborsFrequencies = make([]NeighborsFrequency, model.Settings.NeighborhoodFrequenciesSampleNum)
+			model.DataSamples.NeighborsFrequencies = make([]NeighborsFrequency, model.Settings.FrequenciesSampleNum)
 		} else {
 			// the case in which the last sample isn't the same as the last generation
-			model.DataSamples.NeighborsFrequencies = make([]NeighborsFrequency, model.Settings.NeighborhoodFrequenciesSampleNum+1)
+			model.DataSamples.NeighborsFrequencies = make([]NeighborsFrequency, model.Settings.FrequenciesSampleNum+1)
 		}
 		for sample_i := range model.DataSamples.NeighborsFrequencies {
 			data := make([][]int, 8)

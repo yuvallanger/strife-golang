@@ -23,5 +23,4 @@ var DefaultParameters = Parameters{
 var DefaultSettings = Settings{
 	SnapshotsSampleNum:               50,
 	FrequenciesSampleNum:             50,
-	NeighborhoodFrequenciesSampleNum: 50,
 	DataFilename:                     "model-data.dat"}

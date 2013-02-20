@@ -126,7 +126,6 @@ type Settings struct {
 	DataFilename                     string // TODO
 	SnapshotsSampleNum               int    // TODO
 	FrequenciesSampleNum             int    // TODO
-	NeighborhoodFrequenciesSampleNum int    // TODO
 }
 
 type Config struct {
@@ -240,7 +239,6 @@ func (settings Settings) String() (s string) {
 	s += fmt.Sprintln("FrequenciesSampleNum:")
 	s += fmt.Sprintln("   ", settings.FrequenciesSampleNum)
 	s += fmt.Sprintln("NeighborhoodFrequenciesSampleNum:")
-	s += fmt.Sprintln("   ", settings.NeighborhoodFrequenciesSampleNum)
 	return
 }
 
