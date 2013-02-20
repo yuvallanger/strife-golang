@@ -28,7 +28,7 @@ func (model *CzaranModel) Fitness(coord Coordinate) float64 {
 	}
 
 	if model.Parameters.CooperationEffectThreshold <= model.CellPGNum(coordToroid) {
-		cost *= (1-model.Parameters.PublicGoodsEffect)
+		cost *= (1 - model.Parameters.PublicGoodsEffect)
 	}
 
 	return model.Parameters.BasalCost / cost
@@ -132,18 +132,24 @@ func (model *CzaranModel) Competition() {
 	c1 = RandCoord(model.Parameters.BoardSize)
 	c2 = RandNeighbor(c1, model.Parameters.BoardSize)
 
-	fitness_1 := model.Fitness(c1)
-	fitness_2 := model.Fitness(c2)
+	if model.CellStrain(c1) == model.CellStrain(c2) {
 
-	// Randomize fo shizzles
-	score := rand.Float64()*fitness_1 - rand.Float64()*fitness_2
+		fitness_1 := model.Fitness(c1)
+		fitness_2 := model.Fitness(c2)
 
-	if score > 0 {
-		// cell 1 wins
-		model.Endgame(c1, c2)
+		// Randomize fo shizzles
+		score := rand.Float64()*fitness_1 - rand.Float64()*fitness_2
+
+		if score > 0 {
+			// cell 1 wins
+			model.Endgame(c1, c2)
+		} else {
+			// cell 2 wins
+			model.Endgame(c2, c1)
+		}
 	} else {
-		// cell 2 wins
-		model.Endgame(c2, c1)
+		// doesn't matter who wins if both are of the same strain.
+		model.Endgame(c1, c2)
 	}
 }
 
@@ -153,7 +159,7 @@ Rotate four (2x2) cells 90 degrees.
 Cells rotate clockwise if "direction" is true and anticlockwise if "direction" is false.
 */
 func (model *CzaranModel) Diffuse(coord00 Coordinate, direction bool) {
-    coordinates, before, after := model.Rotate90(coord00, direction)
+	coordinates, before, after := model.Rotate90(coord00, direction)
 
 	model.UpdateArrays(coordinates[0][0], after[0][0], before[0][0])
 	model.UpdateArrays(coordinates[0][1], after[0][1], before[0][1])
