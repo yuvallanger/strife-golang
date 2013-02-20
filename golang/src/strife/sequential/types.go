@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"miscow"
+	"strife/flags"
 	"time"
 )
 
@@ -58,6 +59,7 @@ type CzaranModel struct {
 }
 
 type Model struct {
+	CommandlineFlags          flags.Flags
 	Parameters     Parameters
 	Settings       Settings
 	BoardStrain    BoardStrain

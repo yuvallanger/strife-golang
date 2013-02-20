@@ -40,7 +40,7 @@ func (m *Model) get_snapshots_sample_rate() int {
 			return m.Parameters.Generations/m.Settings.SnapshotsSampleNum + 1
 		}
 	}
-	return 0
+	return model.Parameters.Generations
 }
 
 func (m *Model) get_frequencies_sample_rate() int {
@@ -88,6 +88,7 @@ func Main(cmdln_flags flags.Flags) {
 	// Decided according to commandline flags.
 	if cmdln_flags.Avigdorflag {
 		model := new(AvigdorModel)
+		model.CommandlineFlags = cmdln_flags
 		model.setStartTime()
 		model.Parameters = params
 		model.Settings = settings
@@ -136,6 +137,7 @@ func Main(cmdln_flags flags.Flags) {
 
 	if cmdln_flags.Czaranflag {
 		model := new(CzaranModel)
+		model.CommandlineFlags = cmdln_flags
 		model.setStartTime()
 		model.Parameters = params
 		model.Settings = settings
