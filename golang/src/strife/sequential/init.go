@@ -44,12 +44,12 @@ func (model *Model) initDataSamples() {
 }
 
 func (model *Model) SampleNum(freq int) (sampleNum int) {
-	if model.Parameters.Generations%freq == 0 {
+	if (model.Parameters.Generations-1)%freq == 0 {
 		// the case in which the last sample is the same as the last generation
-		sampleNum = model.Parameters.Generations/freq + 1
+		sampleNum = (model.Parameters.Generations / freq) + 1
 	} else {
 		// the case in which the last snapshot isn't the same as the last generation
-		sampleNum = model.Parameters.Generations/freq + 2
+		sampleNum = (model.Parameters.Generations / freq) + 2
 	}
 	return sampleNum
 }
