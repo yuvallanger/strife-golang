@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"os/exec"
 	"runtime/pprof"
 	"strife/flags"
 	"time"
@@ -49,12 +50,18 @@ func Main(cmdln_flags flags.Flags) {
 	fmt.Printf("Settings:\n%+v\n", settings)
 	fmt.Scanln()
 
+    gitcommithash, err := exec.Command("git", "rev-parse", "--verify", "HEAD").Output()
+    if err != nil {
+        log.Fatalln(err)
+    }
+
 	tstart := time.Now()
 
 	// Which simulation model do we want to run?
 	// Decided according to commandline flags.
 	if cmdln_flags.Avigdorflag {
 		model := new(AvigdorModel)
+        model.GitCommitHash = gitcommithash
 		model.CommandlineFlags = cmdln_flags
 		model.setStartTime()
 		model.Parameters = params
@@ -105,6 +112,7 @@ func Main(cmdln_flags flags.Flags) {
 
 	if cmdln_flags.Czaranflag {
 		model := new(CzaranModel)
+        model.GitCommitHash = gitcommithash
 		model.CommandlineFlags = cmdln_flags
 		model.setStartTime()
 		model.Parameters = params

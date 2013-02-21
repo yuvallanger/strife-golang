@@ -74,6 +74,7 @@ type Model struct {
 	GenerationIdx int
 	//RandomState      rand.Rand
 	StartTime int64 // start time in unix nanoseconds
+    GitCommitHash string
 }
 
 type Snapshot struct {
