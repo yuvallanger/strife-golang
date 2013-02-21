@@ -46,9 +46,7 @@ func Main(cmdln_flags flags.Flags) {
 	// Reading configuration file
 	params, settings := load_config(cmdln_flags)
 	fmt.Printf("Parameters:\n%+v\n", params)
-	fmt.Scanln()
 	fmt.Printf("Settings:\n%+v\n", settings)
-	fmt.Scanln()
 
     gitcommithash, err := exec.Command("git", "rev-parse", "--verify", "HEAD").Output()
     if err != nil {
