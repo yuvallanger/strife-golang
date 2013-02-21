@@ -21,6 +21,6 @@ var DefaultParameters = Parameters{
 	PublicGoodsEffect:          0.6}
 
 var DefaultSettings = Settings{
-	SnapshotsSampleNum:               50,
-	FrequenciesSampleNum:             50,
+	GenerationsPerSnapshotSample:     50,
+	GenerationsPerFrequencySample:    50,
 	DataFilename:                     "model-data.dat"}

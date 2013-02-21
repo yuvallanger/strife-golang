@@ -32,28 +32,6 @@ func load_config(cmdln_flags flags.Flags) (parameters Parameters, settings Setti
 	return
 }
 
-func (model *Model) SnapshotsSampleRate() int {
-	if model.Settings.SnapshotsSampleNum != 0 {
-		if model.Parameters.Generations%model.Settings.SnapshotsSampleNum == 0 {
-			return model.Parameters.Generations / model.Settings.SnapshotsSampleNum
-		} else {
-			return model.Parameters.Generations/model.Settings.SnapshotsSampleNum + 1
-		}
-	}
-	return model.Parameters.Generations
-}
-
-func (m *Model) FrequenciesSampleRate() int {
-	if m.Settings.FrequenciesSampleNum != 0 {
-		if m.Parameters.Generations%m.Settings.FrequenciesSampleNum == 0 {
-			return m.Parameters.Generations / m.Settings.FrequenciesSampleNum
-		} else {
-			return m.Parameters.Generations/m.Settings.FrequenciesSampleNum + 1
-		}
-	}
-	return m.Parameters.Generations
-}
-
 func Main(cmdln_flags flags.Flags) {
 	if cmdln_flags.Cpuprofileflag != "" {
 		f, err := os.Create(cmdln_flags.Cpuprofileflag)
@@ -206,25 +184,17 @@ func run(model Simulation, cmdln_flags flags.Flags) {
 }
 
 func (model *Model) sample() {
-	var snapshotsSampleRate int = model.SnapshotsSampleRate()
-	var frequenciesSampleRate int = model.FrequenciesSampleRate()
-	// take a sample only if we were asked to.
-	if model.Settings.SnapshotsSampleNum != 0 {
-		// take sample only every snapshots_sample_rate generations
-		// or when we're at the last generation.
-		if model.GenerationIdx%snapshotsSampleRate == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
-			model.take_board_sample()
-		}
+	// take sample only every snapshots_sample_rate generations
+	// or when we're at the last generation.
+	if model.GenerationIdx%model.Settings.GenerationsPerSnapshotSample == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
+		model.take_board_sample()
 	}
 
-	// take a sample only if we were asked to.
-	if model.Settings.FrequenciesSampleNum != 0 {
-		// take sample only every frequencies_sample_rate generations
-		// or when we're at the last generation.
-		if model.GenerationIdx%frequenciesSampleRate == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
-			model.take_frequencies_sample()
-			model.take_neighbors_frequencies_sample()
-		}
+	// take sample only every GenerationsPerFrequency
+	// or when we're at the last generation.
+	if model.GenerationIdx%model.Settings.GenerationsPerFrequencySample == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
+		model.take_frequencies_sample()
+		model.take_neighbors_frequencies_sample()
 	}
 }
 
@@ -279,13 +249,13 @@ func (model *Model) showtiming(t_start time.Time, dt_iter time.Duration) {
 	t_elapsed := time.Now().Sub(t_start)
 	dt_tot_runtime := time.Duration(dt_iter.Nanoseconds()*int64(model.Parameters.Generations)) * time.Nanosecond
 	dt_tot_runtime_300_10000 := time.Duration(dt_iter.Nanoseconds()*10000*300*300/int64(model.Parameters.BoardSize*model.Parameters.BoardSize)) * time.Nanosecond
-	dt_eta := time.Duration(dt_iter.Nanoseconds() * int64(model.Parameters.Generations - model.GenerationIdx)) * time.Nanosecond
-	dt_eta_300_10000 := time.Duration(dt_iter.Nanoseconds() * int64(model.Parameters.Generations - model.GenerationIdx) * 10000 * 300 * 300 / int64(model.Parameters.BoardSize*model.Parameters.BoardSize)) * time.Nanosecond
+	dt_eta := time.Duration(dt_iter.Nanoseconds()*int64(model.Parameters.Generations-model.GenerationIdx)) * time.Nanosecond
+	dt_eta_300_10000 := time.Duration(dt_iter.Nanoseconds()*int64(model.Parameters.Generations-model.GenerationIdx)*10000*300*300/int64(model.Parameters.BoardSize*model.Parameters.BoardSize)) * time.Nanosecond
 
 	t_finish := t_start.Add(dt_tot_runtime)
 
 	fmt.Println("Since start:", t_elapsed)
-    fmt.Printf("Generation (%v tot): %v\n", model.Parameters.Generations, model.GenerationIdx)
+	fmt.Printf("Generation (%v tot): %v\n", model.Parameters.Generations, model.GenerationIdx)
 	fmt.Println("Expected total run time:", dt_tot_runtime)
 	fmt.Println("Time to finish:", dt_eta)
 	fmt.Println("Expected total run time (10k gen, 300^2 board):", dt_tot_runtime_300_10000)

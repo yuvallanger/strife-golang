@@ -43,62 +43,71 @@ func (model *Model) initDataSamples() {
 	model.initDataSamplesNeighborhoodFrequencies()
 }
 
+func (model *Model) SampleNum(freq int) (sampleNum int) {
+	if model.Parameters.Generations%freq == 0 {
+		// the case in which the last sample is the same as the last generation
+		sampleNum = model.Parameters.Generations/freq + 1
+	} else {
+		// the case in which the last snapshot isn't the same as the last generation
+		sampleNum = model.Parameters.Generations/freq + 2
+	}
+	return sampleNum
+}
+
 // Initialize the board snapshots samples
 func (model *Model) initDataSamplesSnapshots() {
-	if model.Settings.SnapshotsSampleNum != 0 {
-		if model.Parameters.Generations%model.Settings.SnapshotsSampleNum == 0 {
-			// the case in which the last snapshot is the same as the last generation
-			model.DataSamples.Snapshots = make([]Snapshot, model.Settings.SnapshotsSampleNum)
-		} else {
-			// the case in which the last snapshot isn't the same as the last generation
-			model.DataSamples.Snapshots = make([]Snapshot, model.Settings.SnapshotsSampleNum+1)
+	// This is the number of samples we'll take
+	sampleNum := model.SampleNum(model.Settings.GenerationsPerSnapshotSample)
+	model.DataSamples.Snapshots = make([]Snapshot, sampleNum)
+
+	for sample_i := range model.DataSamples.Snapshots {
+		model.DataSamples.Snapshots[sample_i].Data = make([][]int, model.Parameters.BoardSize)
+		for row := range model.DataSamples.Snapshots[sample_i].Data {
+			model.DataSamples.Snapshots[sample_i].Data[row] = make([]int, model.Parameters.BoardSize)
 		}
-		for sample_i := range model.DataSamples.Snapshots {
-			model.DataSamples.Snapshots[sample_i].Data = make([][]int, model.Parameters.BoardSize)
-			for row := range model.DataSamples.Snapshots[sample_i].Data {
-				model.DataSamples.Snapshots[sample_i].Data[row] = make([]int, model.Parameters.BoardSize)
-			}
-			//fmt.Println(sample_i, model.DataSamples.Snapshots[sample_i])
-		}
-		model.DataSamples.Snapshots = model.DataSamples.Snapshots[0:1]
+		//fmt.Println(sample_i, model.DataSamples.Snapshots[sample_i])
 	}
+
+	// This trick makes it easy to take samples one after the next.
+	// Every time you take a sample, you assign it to Slicename[len(Slicename)-1],
+	// then you increase its len field by assigning Slicename = Slicename[0:len(Slicename)+1].
+	model.DataSamples.Snapshots = model.DataSamples.Snapshots[0:1]
 }
 
 // Initialize the strain frequencies samples
 func (model *Model) initDataSamplesFrequencies() {
-	if model.Settings.FrequenciesSampleNum != 0 {
-		if model.Parameters.Generations%model.Settings.FrequenciesSampleNum == 0 {
-			// the case in which the last sample is the same as the last generation
-			model.DataSamples.Frequencies = make([]Frequency, model.Settings.FrequenciesSampleNum)
-		} else {
-			// the case in which the last sample isn't the same as the last generation
-			model.DataSamples.Frequencies = make([]Frequency, model.Settings.FrequenciesSampleNum+1)
-		}
-		for sample_i := range model.DataSamples.Frequencies {
-			model.DataSamples.Frequencies[sample_i].Data = make([]int, 8)
-		}
-		model.DataSamples.Frequencies = model.DataSamples.Frequencies[0:1]
+	// This is the number of samples we'll take
+	sampleNum := model.SampleNum(model.Settings.GenerationsPerFrequencySample)
+
+	model.DataSamples.Frequencies = make([]Frequency, sampleNum)
+
+	for sample_i := range model.DataSamples.Frequencies {
+		model.DataSamples.Frequencies[sample_i].Data = make([]int, 8)
 	}
+
+	// This trick makes it easy to take samples one after the next.
+	// Every time you take a sample, you assign it to Slicename[len(Slicename)-1],
+	// then you increase its len field by assigning Slicename = Slicename[0:len(Slicename)+1].
+	model.DataSamples.Frequencies = model.DataSamples.Frequencies[0:1]
 }
 
 // Initialize the neighbors frequencies samples
 func (model *Model) initDataSamplesNeighborhoodFrequencies() {
-	if model.Settings.FrequenciesSampleNum != 0 {
-		if model.Parameters.Generations%model.Settings.FrequenciesSampleNum == 0 {
-			// the case in which the last sample is the same as the last generation
-			model.DataSamples.NeighborsFrequencies = make([]NeighborsFrequency, model.Settings.FrequenciesSampleNum)
-		} else {
-			// the case in which the last sample isn't the same as the last generation
-			model.DataSamples.NeighborsFrequencies = make([]NeighborsFrequency, model.Settings.FrequenciesSampleNum+1)
+	// This is the number of samples we'll take
+	sampleNum := model.SampleNum(model.Settings.GenerationsPerFrequencySample)
+
+	model.DataSamples.NeighborsFrequencies = make([]NeighborsFrequency, sampleNum)
+	for sample_i := range model.DataSamples.NeighborsFrequencies {
+		data := make([][]int, 8)
+		// for each strain we'll count how many strains are around it.
+		for strain_i := range data {
+			data[strain_i] = make([]int, 8)
 		}
-		for sample_i := range model.DataSamples.NeighborsFrequencies {
-			data := make([][]int, 8)
-			// for each strain we'll count how many strains are around it.
-			for strain_i := range data {
-				data[strain_i] = make([]int, 8)
-			}
-			model.DataSamples.NeighborsFrequencies[sample_i].Data = data
-		}
-		model.DataSamples.NeighborsFrequencies = model.DataSamples.NeighborsFrequencies[0:1]
+		model.DataSamples.NeighborsFrequencies[sample_i].Data = data
 	}
+
+	// This trick makes it easy to take samples one after the next.
+	// Every time you take a sample, you assign it to Slicename[len(Slicename)-1],
+	// then you increase its len field by assigning Slicename = Slicename[0:len(Slicename)+1].
+	model.DataSamples.NeighborsFrequencies = model.DataSamples.NeighborsFrequencies[0:1]
 }

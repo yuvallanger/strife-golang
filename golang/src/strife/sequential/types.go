@@ -59,14 +59,14 @@ type CzaranModel struct {
 }
 
 type Model struct {
-	CommandlineFlags          flags.Flags
-	Parameters     Parameters
-	Settings       Settings
-	BoardStrain    BoardStrain
-	BoardSignalNum BoardSignalNum
-	BoardProd      BoardProd
-	BoardPGNum     BoardPGNum
-	DataSamples    struct {
+	CommandlineFlags flags.Flags
+	Parameters       Parameters
+	Settings         Settings
+	BoardStrain      BoardStrain
+	BoardSignalNum   BoardSignalNum
+	BoardProd        BoardProd
+	BoardPGNum       BoardPGNum
+	DataSamples      struct {
 		Snapshots            []Snapshot
 		Frequencies          []Frequency
 		NeighborsFrequencies []NeighborsFrequency
@@ -123,9 +123,9 @@ type Parameters struct {
 }
 
 type Settings struct {
-	DataFilename                     string // TODO
-	SnapshotsSampleNum               int    // TODO
-	FrequenciesSampleNum             int    // TODO
+	DataFilename                  string // TODO
+	GenerationsPerSnapshotSample  int    // TODO
+	GenerationsPerFrequencySample int    // TODO
 }
 
 type Config struct {
@@ -234,11 +234,10 @@ func (settings Settings) String() (s string) {
 	s += fmt.Sprintln("Settings:")
 	s += fmt.Sprintln("DataFilename:")
 	s += fmt.Sprintln("   ", settings.DataFilename)
-	s += fmt.Sprintln("SnapshotsSampleNum:")
-	s += fmt.Sprintln("   ", settings.SnapshotsSampleNum)
-	s += fmt.Sprintln("FrequenciesSampleNum:")
-	s += fmt.Sprintln("   ", settings.FrequenciesSampleNum)
-	s += fmt.Sprintln("NeighborhoodFrequenciesSampleNum:")
+	s += fmt.Sprintln("GenerationsPerSnapshotSample:")
+	s += fmt.Sprintln("   ", settings.GenerationsPerSnapshotSample)
+    s += fmt.Sprintln("GenerationsPerFrequencySample:")
+	s += fmt.Sprintln("   ", settings.GenerationsPerFrequencySample)
 	return
 }
 
