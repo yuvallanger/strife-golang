@@ -8,8 +8,7 @@ import PIL.Image
 
 
 def numpyify_sample_sequence(sequence):
-    print 'numpyify_sample_sequence'
-    print type(sequence)
+    print 'Converting board data into usable numpy arrays'
     l_generation = []
     l_data = []
     if sequence is not None:
@@ -20,38 +19,48 @@ def numpyify_sample_sequence(sequence):
                 'data': np.array(l_data)}
     return None
 
+legend = ['rsc','Rsc','rSc','RSc','rsC','RsC','rSC','RSC']
 
 def output_frequencies_samples(output_filename_prefix, frequencies_samples):
-    print 'output_frequencies_samples'
-    print type(frequencies_samples)
+    print 'Starting working on frequencies samples'
+    pl.plt.clf()
     pl.plt.hold(True)
     for strain in range(8):
-        print 'strain:', strain, pl.plt.plot(frequencies_samples['generation'], frequencies_samples['data'][:,strain])
-    pl.plt.legend(['rsc','Rsc','rSc','RSc','rsC','RsC','rSC','RSC'])
-    print 'savefig:', pl.plt.savefig(output_filename_prefix+'-frequencies.png')
+        print 'plotting strain:', legend[strain]
+        pl.plt.plot(frequencies_samples['generation'], frequencies_samples['data'][:,strain])
+    pl.plt.ylabel('# cells of strain')
+    pl.plt.xlabel('generation #')
+    pl.plt.legend(legend)
+    output_filename = output_filename_prefix+'-frequencies.png'
+    print 'Saving figure:', output_filename
+    pl.plt.savefig(output_filename)
     pl.plt.hold(False)
 
 def output_neighbors_frequencies_samples(output_filename_prefix, neighbors_frequencies_samples):
-    print 'output_neighbors_frequencies_samples'
-    print type(neighbors_frequencies_samples)
+    print 'Starting working on neighbors frequencies samples'
     pl.plt.clf()
     for center_strain in range(8):
+        print 'Plotting neighbors of strain', legend[center_strain]
         pl.plt.hold(True)
         for neighbor_strain in range(8):
-            print pl.plt.plot(neighbors_frequencies_samples['generation'], neighbors_frequencies_samples['data'][:,center_strain,neighbor_strain])
-        pl.plt.legend(['rsc','Rsc','rSc','RSc','rsC','RsC','rSC','RSC'])
-        output_filename_prefix_strain = output_filename_prefix+'-'+str(center_strain)+'-neighbors-frequencies.png'
-        print output_filename_prefix_strain
-        print 'savefig:', pl.plt.savefig(output_filename_prefix_strain)
+            print 'Plotting neighbor strain', legend[neighbor_strain]
+            if center_strain != neighbor_strain:
+                pl.plt.plot(neighbors_frequencies_samples['generation'],
+                            neighbors_frequencies_samples['data'][:,center_strain,neighbor_strain])
+        pl.plt.ylabel('# cells neighboring strain ' + legend[center_strain])
+        pl.plt.xlabel('generation #')
+        pl.plt.legend(legend)
+        output_filename = output_filename_prefix+'-'+str(center_strain)+'-neighbors-frequencies.png'
+        print 'Saving image', output_filename
+        pl.plt.savefig(output_filename)
         pl.plt.hold(False)
         pl.plt.clf()
 
 def output_board_samples(output_filename_prefix, board_snapshot_samples):
-    print 'output_board_samples'
-    print type(board_snapshot_samples)
+    print 'Working on board images'
     for i in range(len(board_snapshot_samples['data'])):
-        print i
         image_filename = '{}-{}-{:05d}.png'.format(output_filename_prefix,'board-snapshot',board_snapshot_samples['generation'][i])
+        print "Working on", image_filename
         im = imagify_strain_board(board_snapshot_samples['data'][i])
         im = PIL.Image.fromarray(im, 'RGB')
         im.thumbnail((600, 600))
@@ -68,21 +77,19 @@ def imagify_strain_board(strain_board):
 
 def main():
     data_filename = sys.argv[1]
-    print 'data_filename:', data_filename
+    print 'Using data from:', data_filename
     data = json.load(open(data_filename))
 
     output_filename_prefix = 'plots-' + data_filename
 
-    board_snapshot_samples = numpyify_sample_sequence(data['DataSamples']['Snapshots'])
     frequencies_samples = numpyify_sample_sequence(data['DataSamples']['Frequencies'])
     neighbors_frequencies_samples = numpyify_sample_sequence(data['DataSamples']['NeighborsFrequencies'])
-    print board_snapshot_samples['data'].shape
-    print frequencies_samples['data'].shape
-    print neighbors_frequencies_samples['data'].shape
-    if board_snapshot_samples is not None: output_board_samples(output_filename_prefix, board_snapshot_samples)
     if frequencies_samples is not None: output_frequencies_samples(output_filename_prefix, frequencies_samples)
     if neighbors_frequencies_samples is not None: output_neighbors_frequencies_samples(output_filename_prefix, neighbors_frequencies_samples)
+    for n in sys.argv:
+        if n == '--images':
+            board_snapshot_samples = numpyify_sample_sequence(data['DataSamples']['Snapshots'])
+            if board_snapshot_samples is not None: output_board_samples(output_filename_prefix, board_snapshot_samples)
 
 if __name__ == '__main__':
-    print '__name__ == "__main__"'
     main()
