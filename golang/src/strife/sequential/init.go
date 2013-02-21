@@ -43,13 +43,15 @@ func (model *Model) initDataSamples() {
 	model.initDataSamplesNeighborhoodFrequencies()
 }
 
+// Number of samples we will take in that frequency.
+// We take a sample at the start of each generation iteration and after the last iteration.
 func (model *Model) SampleNum(freq int) (sampleNum int) {
 	if (model.Parameters.Generations-1)%freq == 0 {
 		// the case in which the last sample is the same as the last generation
-		sampleNum = (model.Parameters.Generations / freq) + 1
+		sampleNum = (model.Parameters.Generations / freq) + 2
 	} else {
 		// the case in which the last snapshot isn't the same as the last generation
-		sampleNum = (model.Parameters.Generations / freq) + 2
+		sampleNum = (model.Parameters.Generations / freq) + 3
 	}
 	return sampleNum
 }

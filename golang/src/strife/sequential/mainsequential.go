@@ -71,6 +71,8 @@ func Main(cmdln_flags flags.Flags) {
 		fmt.Println("model.Parameters.Generations = ", model.Parameters.Generations)
 		fmt.Println("model.Generation_i = ", model.GenerationIdx)
 		for model.GenerationIdx = 0; model.GenerationIdx < model.Parameters.Generations; model.GenerationIdx++ {
+			// sample before passing of a generation.
+			model.sample()
 			time_per_iter := time.Now()
 			for competition_i := 0; competition_i < model.Parameters.BoardSize*model.Parameters.BoardSize; competition_i++ {
 				model.Competition()
@@ -88,12 +90,11 @@ func Main(cmdln_flags flags.Flags) {
 				}
 			}
 
-			model.sample()
-
 			if model.GenerationIdx%10 == 0 {
 				model.showtiming(tstart, time.Since(time_per_iter))
 			}
 		}
+		model.sample()
 		if err := model.save_json(); err != nil {
 			panic(err)
 		}
@@ -120,6 +121,7 @@ func Main(cmdln_flags flags.Flags) {
 		fmt.Println("model.Parameters.Generations = ", model.Parameters.Generations)
 		fmt.Println("model.Generation_i = ", model.GenerationIdx)
 		for model.GenerationIdx = 0; model.GenerationIdx < model.Parameters.Generations; model.GenerationIdx++ {
+			model.sample()
 			time_per_iter := time.Now()
 			for competition_i := 0; competition_i < model.Parameters.BoardSize*model.Parameters.BoardSize; competition_i++ {
 				model.Competition()
@@ -137,12 +139,11 @@ func Main(cmdln_flags flags.Flags) {
 				}
 			}
 
-			model.sample()
-
 			if model.GenerationIdx%10 == 0 {
 				model.showtiming(tstart, time.Since(time_per_iter))
 			}
 		}
+		model.sample()
 		if err := model.save_json(); err != nil {
 			panic(err)
 		}
@@ -186,13 +187,13 @@ func run(model Simulation, cmdln_flags flags.Flags) {
 func (model *Model) sample() {
 	// take sample only every snapshots_sample_rate generations
 	// or when we're at the last generation.
-	if model.GenerationIdx%model.Settings.GenerationsPerSnapshotSample == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
+	if model.GenerationIdx%model.Settings.GenerationsPerSnapshotSample == 0 || model.GenerationIdx == model.Parameters.Generations {
 		model.take_board_sample()
 	}
 
 	// take sample only every GenerationsPerFrequency
 	// or when we're at the last generation.
-	if model.GenerationIdx%model.Settings.GenerationsPerFrequencySample == 0 || model.GenerationIdx == model.Parameters.Generations-1 {
+	if model.GenerationIdx%model.Settings.GenerationsPerFrequencySample == 0 || model.GenerationIdx == model.Parameters.Generations {
 		model.take_frequencies_sample()
 		model.take_neighbors_frequencies_sample()
 	}
