@@ -61,7 +61,7 @@ func Main(cmdln_flags flags.Flags) {
 	// Decided according to commandline flags.
 	if cmdln_flags.Avigdorflag {
 		model := new(AvigdorModel)
-        model.GitCommitHash = gitcommithash
+        model.GitCommitHash = string(gitcommithash)
 		model.CommandlineFlags = cmdln_flags
 		model.setStartTime()
 		model.Parameters = params
@@ -112,7 +112,7 @@ func Main(cmdln_flags flags.Flags) {
 
 	if cmdln_flags.Czaranflag {
 		model := new(CzaranModel)
-        model.GitCommitHash = gitcommithash
+        model.GitCommitHash = string(gitcommithash)
 		model.CommandlineFlags = cmdln_flags
 		model.setStartTime()
 		model.Parameters = params
