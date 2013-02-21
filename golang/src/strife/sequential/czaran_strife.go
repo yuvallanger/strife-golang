@@ -4,7 +4,7 @@ import (
 	"math/rand"
 )
 
-// Compute the Czaran fitness of the cell at the specified Coordinate
+// Computes the Czaran fitness of a cell at a given Coordinate
 func (model *CzaranModel) Fitness(coord Coordinate) float64 {
 	var cost float64 = model.Parameters.BasalCost
 
@@ -75,7 +75,7 @@ func (model *CzaranModel) UpdateArrays(coord Coordinate, newstrain, oldstrain in
 			// update producer status at signalCoordTorus
 			// Production is active if cell has a working PG gene and:
 			//     The receptor allele is malfunctioned. OR
-			//     The receptor allele is working and the signal level is above threshold.
+			//     The receptor allele is working and the signal level is above the quorum sensing threshold.
 			if g4strain[neighborStrain] == 1 {
 				if r4strain[neighborStrain] == 1 {
 					if model.Parameters.SignalThreshold <= model.CellSignalNum(signalCoordTorus, 1) {
@@ -133,7 +133,9 @@ func (model *CzaranModel) Competition() {
 	c2 = RandNeighbor(c1, model.Parameters.BoardSize)
 
 	if model.CellStrain(c1) == model.CellStrain(c2) {
-
+		// doesn't matter who wins if both are of the same strain, so we pick c1 as winner and c2 as loser.
+		model.Endgame(c1, c2)
+	} else {
 		fitness_1 := model.Fitness(c1)
 		fitness_2 := model.Fitness(c2)
 
@@ -147,9 +149,6 @@ func (model *CzaranModel) Competition() {
 			// cell 2 wins
 			model.Endgame(c2, c1)
 		}
-	} else {
-		// doesn't matter who wins if both are of the same strain.
-		model.Endgame(c1, c2)
 	}
 }
 
