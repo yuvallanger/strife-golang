@@ -198,50 +198,55 @@ func (model *Model) sample() {
 	}
 }
 
+// Takes a sample of BoardStrain
 func (model *Model) take_board_sample() {
-	for i := range model.BoardStrain {
-		model.DataSamples.Snapshots[len(model.DataSamples.Snapshots)-1].Data[i] = append([]int{}, model.BoardStrain[i]...)
-	}
-
-	model.DataSamples.Snapshots[len(model.DataSamples.Snapshots)-1].Generation = model.GenerationIdx
-
 	if len(model.DataSamples.Snapshots) < cap(model.DataSamples.Snapshots) {
 		model.DataSamples.Snapshots = model.DataSamples.Snapshots[0 : len(model.DataSamples.Snapshots)+1]
+
+		for i := range model.BoardStrain {
+			// append(..) copies the content of the slice, not just assigns the reference to the slice.
+			model.DataSamples.Snapshots[len(model.DataSamples.Snapshots)-1].Data[i] = append([]int{}, model.BoardStrain[i]...)
+		}
+
+		// assigns the value of GenerationIdx, as it is just an int, not a slice.
+		model.DataSamples.Snapshots[len(model.DataSamples.Snapshots)-1].Generation = model.GenerationIdx
+
 	}
 }
 
 func (model *Model) take_frequencies_sample() {
-	coord := Coordinate{}
-	for coord.r = 0; coord.r < model.Parameters.BoardSize; coord.r++ {
-		for coord.c = 0; coord.c < model.Parameters.BoardSize; coord.c++ {
-			model.DataSamples.Frequencies[len(model.DataSamples.Frequencies)-1].Data[model.CellStrain(coord)]++
-		}
-	}
-
-	model.DataSamples.Frequencies[len(model.DataSamples.Frequencies)-1].Generation = model.GenerationIdx
-
 	if len(model.DataSamples.Frequencies) < cap(model.DataSamples.Frequencies) {
 		model.DataSamples.Frequencies = model.DataSamples.Frequencies[0 : len(model.DataSamples.Frequencies)+1]
+		coord := Coordinate{}
+		for coord.r = 0; coord.r < model.Parameters.BoardSize; coord.r++ {
+			for coord.c = 0; coord.c < model.Parameters.BoardSize; coord.c++ {
+				// For each strain we meet on BoardStrain, add 1 to its counter.
+				model.DataSamples.Frequencies[len(model.DataSamples.Frequencies)-1].Data[model.CellStrain(coord)]++
+			}
+		}
+
+		model.DataSamples.Frequencies[len(model.DataSamples.Frequencies)-1].Generation = model.GenerationIdx
+
 	}
 }
 
 func (model *Model) take_neighbors_frequencies_sample() {
-	center_coord := Coordinate{}
-	for center_coord.r = 0; center_coord.r < model.Parameters.BoardSize; center_coord.r++ {
-		for center_coord.c = 0; center_coord.c < model.Parameters.BoardSize; center_coord.c++ {
-			rad_coord := Coordinate{}
-			for rad_coord.r = center_coord.r - 1; rad_coord.r < center_coord.r+1; rad_coord.r++ {
-				for rad_coord.c = center_coord.r - 1; rad_coord.c < center_coord.r+1; rad_coord.c++ {
-					model.DataSamples.NeighborsFrequencies[len(model.DataSamples.NeighborsFrequencies)-1].Data[model.CellStrain(center_coord)][model.CellStrain(rad_coord.ToroidCoordinates(model.Parameters.BoardSize))]++
+	if len(model.DataSamples.NeighborsFrequencies) < cap(model.DataSamples.NeighborsFrequencies) {
+		model.DataSamples.NeighborsFrequencies = model.DataSamples.NeighborsFrequencies[0 : len(model.DataSamples.NeighborsFrequencies)+1]
+		center_coord := Coordinate{}
+		for center_coord.r = 0; center_coord.r < model.Parameters.BoardSize; center_coord.r++ {
+			for center_coord.c = 0; center_coord.c < model.Parameters.BoardSize; center_coord.c++ {
+				rad_coord := Coordinate{}
+				for rad_coord.r = center_coord.r - 1; rad_coord.r < center_coord.r+1; rad_coord.r++ {
+					for rad_coord.c = center_coord.r - 1; rad_coord.c < center_coord.r+1; rad_coord.c++ {
+						model.DataSamples.NeighborsFrequencies[len(model.DataSamples.NeighborsFrequencies)-1].Data[model.CellStrain(center_coord)][model.CellStrain(rad_coord.ToroidCoordinates(model.Parameters.BoardSize))]++
+					}
 				}
 			}
 		}
-	}
 
-	model.DataSamples.NeighborsFrequencies[len(model.DataSamples.NeighborsFrequencies)-1].Generation = model.GenerationIdx
+		model.DataSamples.NeighborsFrequencies[len(model.DataSamples.NeighborsFrequencies)-1].Generation = model.GenerationIdx
 
-	if len(model.DataSamples.NeighborsFrequencies) < cap(model.DataSamples.NeighborsFrequencies) {
-		model.DataSamples.NeighborsFrequencies = model.DataSamples.NeighborsFrequencies[0 : len(model.DataSamples.NeighborsFrequencies)+1]
 	}
 }
 

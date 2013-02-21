@@ -71,7 +71,7 @@ func (model *Model) initDataSamplesSnapshots() {
 	// This trick makes it easy to take samples one after the next.
 	// Every time you take a sample, you assign it to Slicename[len(Slicename)-1],
 	// then you increase its len field by assigning Slicename = Slicename[0:len(Slicename)+1].
-	model.DataSamples.Snapshots = model.DataSamples.Snapshots[0:1]
+	model.DataSamples.Snapshots = model.DataSamples.Snapshots[0:0]
 }
 
 // Initialize the strain frequencies samples
@@ -88,7 +88,7 @@ func (model *Model) initDataSamplesFrequencies() {
 	// This trick makes it easy to take samples one after the next.
 	// Every time you take a sample, you assign it to Slicename[len(Slicename)-1],
 	// then you increase its len field by assigning Slicename = Slicename[0:len(Slicename)+1].
-	model.DataSamples.Frequencies = model.DataSamples.Frequencies[0:1]
+	model.DataSamples.Frequencies = model.DataSamples.Frequencies[0:0]
 }
 
 // Initialize the neighbors frequencies samples
@@ -109,5 +109,5 @@ func (model *Model) initDataSamplesNeighborhoodFrequencies() {
 	// This trick makes it easy to take samples one after the next.
 	// Every time you take a sample, you assign it to Slicename[len(Slicename)-1],
 	// then you increase its len field by assigning Slicename = Slicename[0:len(Slicename)+1].
-	model.DataSamples.NeighborsFrequencies = model.DataSamples.NeighborsFrequencies[0:1]
+	model.DataSamples.NeighborsFrequencies = model.DataSamples.NeighborsFrequencies[0:0]
 }
