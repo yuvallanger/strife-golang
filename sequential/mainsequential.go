@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime/pprof"
-	"strife/flags"
+	"gitlab.com/yuvallanger/strife-golang/flags"
 	"time"
 )
 
