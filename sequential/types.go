@@ -3,8 +3,8 @@ package sequential
 import (
 	"fmt"
 	"math/rand"
-	"miscow"
-	"strife/flags"
+	"gitlab.com/yuvallanger/miscow"
+	"gitlab.com/yuvallanger/strife-golang/flags"
 	"time"
 )
 

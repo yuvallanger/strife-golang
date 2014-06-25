@@ -2,7 +2,7 @@ package sequential
 
 import (
 	"math/rand"
-	"miscow"
+	"gitlab.com/yuvallanger/miscow"
 )
 
 func StrainSpec(r, s, g int) int {

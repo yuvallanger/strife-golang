@@ -3,9 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"strife/concurrent"
-	"strife/flags"
-	"strife/sequential"
+	"gitlab.com/yuvallanger/strife-golang/flags"
+	"gitlab.com/yuvallanger/strife-golang/sequential"
 )
 
 func main() {
