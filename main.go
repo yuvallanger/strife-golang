@@ -15,9 +15,5 @@ func main() {
 		sequential.Main(cmdln_flags)
 	}
 
-	if cmdln_flags.Concurrentflag {
-		concurrent.Main(cmdln_flags)
-	}
-
 	flag.Usage()
 }
