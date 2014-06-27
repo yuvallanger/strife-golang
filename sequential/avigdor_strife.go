@@ -14,8 +14,8 @@ func (model *AvigdorModel) Fitness(coord Coordinate) float64 {
 		cost += model.Parameters.CooperationCost
 	}
 
-    cost += model.Parameters.SignalCost
-    cost += model.Parameters.ReceptorCost
+	cost += model.Parameters.SignalCost
+	cost += model.Parameters.ReceptorCost
 
 	if model.Parameters.CooperationEffectThreshold <= model.CellPGNum(coordToroid) {
 		cost *= (1 - model.Parameters.PublicGoodsEffect)
@@ -37,7 +37,7 @@ func (model *AvigdorModel) Mutate(strain int) int {
 	}
 
 	// in Avigdor's model, the public goods allele is always functional (but not always expressed).
-	return StrainSpec(r, s, 1) 
+	return StrainSpec(r, s, 1)
 }
 
 func (model *AvigdorModel) UpdateArrays(coord Coordinate, newstrain, oldstrain int) {

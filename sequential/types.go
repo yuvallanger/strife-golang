@@ -3,9 +3,10 @@ package sequential
 import (
 	"fmt"
 	"math/rand"
+	"time"
+
 	"gitlab.com/yuvallanger/miscow"
 	"gitlab.com/yuvallanger/strife-golang/flags"
-	"time"
 )
 
 var r4strain = [8]int{0, 1, 0, 1, 0, 1, 0, 1} // index is the strain. value is the receptor allele.
@@ -73,8 +74,8 @@ type Model struct {
 	}
 	GenerationIdx int
 	//RandomState      rand.Rand
-	StartTime int64 // start time in unix nanoseconds
-    GitCommitHash string
+	StartTime     int64 // start time in unix nanoseconds
+	GitCommitHash string
 }
 
 type Snapshot struct {
@@ -237,7 +238,7 @@ func (settings Settings) String() (s string) {
 	s += fmt.Sprintln("   ", settings.DataFilename)
 	s += fmt.Sprintln("GenerationsPerSnapshotSample:")
 	s += fmt.Sprintln("   ", settings.GenerationsPerSnapshotSample)
-    s += fmt.Sprintln("GenerationsPerFrequencySample:")
+	s += fmt.Sprintln("GenerationsPerFrequencySample:")
 	s += fmt.Sprintln("   ", settings.GenerationsPerFrequencySample)
 	return
 }

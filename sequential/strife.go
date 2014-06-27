@@ -2,6 +2,7 @@ package sequential
 
 import (
 	"math/rand"
+
 	"gitlab.com/yuvallanger/miscow"
 )
 
@@ -62,5 +63,5 @@ func (model *Model) Rotate90(coord00 Coordinate, direction bool) (coordinates [2
 	model.SetCellStrain(coordinates[1][0], after[1][0])
 	model.SetCellStrain(coordinates[1][1], after[1][1])
 
-    return
+	return
 }

@@ -2,15 +2,17 @@
 package sequential
 
 import (
-	"code.google.com/p/gcfg"
 	"fmt"
 	"log"
 	"math/rand"
 	"os"
 	"os/exec"
 	"runtime/pprof"
-	"gitlab.com/yuvallanger/strife-golang/flags"
 	"time"
+
+	"code.google.com/p/gcfg"
+
+	"gitlab.com/yuvallanger/strife-golang/flags"
 )
 
 func load_config(cmdln_flags flags.Flags) (parameters Parameters, settings Settings) {
@@ -48,116 +50,60 @@ func Main(cmdln_flags flags.Flags) {
 	fmt.Printf("Parameters:\n%+v\n", params)
 	fmt.Printf("Settings:\n%+v\n", settings)
 
-    gitcommithash, err := exec.Command("git", "rev-parse", "--verify", "HEAD").Output()
-    if err != nil {
-        log.Fatalln(err)
-    }
+	gitcommithash, err := exec.Command("git", "rev-parse", "--verify", "HEAD").Output()
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	tstart := time.Now()
 
 	// Which simulation model do we want to run?
 	// Decided according to commandline flags.
-	if cmdln_flags.Avigdorflag {
-		model := new(AvigdorModel)
-        model.GitCommitHash = string(gitcommithash)
-		model.CommandlineFlags = cmdln_flags
-		model.setStartTime()
-		model.Parameters = params
-		model.Settings = settings
-		model.initBoards()
-		model.initDataSamples()
-		if err := model.save_json(); err != nil {
-			panic(err)
-		}
-
-		// TODO cmdln_flags should be inside model's settings
-		var diffusion_num int = diffusionIterPerGeneration(model.Parameters.D, model.Parameters.BoardSize)
-		fmt.Println("diffusion_num: ", diffusion_num)
-		fmt.Println("model.Parameters.Generations = ", model.Parameters.Generations)
-		fmt.Println("model.Generation_i = ", model.GenerationIdx)
-		for model.GenerationIdx = 0; model.GenerationIdx < model.Parameters.Generations; model.GenerationIdx++ {
-			// sample before passing of a generation.
-			model.sample()
-			time_per_iter := time.Now()
-			for competition_i := 0; competition_i < model.Parameters.BoardSize*model.Parameters.BoardSize; competition_i++ {
-				model.Competition()
-			}
-
-			for diffusion_i := 0; diffusion_i < diffusion_num; diffusion_i++ {
-				if rand.Intn(2) == 0 {
-					model.Diffuse(Coordinate{r: rand.Intn(model.Parameters.BoardSize),
-						c: rand.Intn(model.Parameters.BoardSize)},
-						true)
-				} else {
-					model.Diffuse(Coordinate{r: rand.Intn(model.Parameters.BoardSize),
-						c: rand.Intn(model.Parameters.BoardSize)},
-						false)
-				}
-			}
-
-			if model.GenerationIdx%10 == 0 {
-				model.showtiming(tstart, time.Since(time_per_iter))
-			}
-		}
-		model.sample()
-		if err := model.save_json(); err != nil {
-			panic(err)
-		}
-		if cmdln_flags.Imagesflag {
-			model.SaveSnapshotsAsImages()
-		}
+	model := new(AvigdorModel)
+	model.GitCommitHash = string(gitcommithash)
+	model.CommandlineFlags = cmdln_flags
+	model.setStartTime()
+	model.Parameters = params
+	model.Settings = settings
+	model.initBoards()
+	model.initDataSamples()
+	if err := model.save_json(); err != nil {
+		panic(err)
 	}
 
-	if cmdln_flags.Czaranflag {
-		model := new(CzaranModel)
-        model.GitCommitHash = string(gitcommithash)
-		model.CommandlineFlags = cmdln_flags
-		model.setStartTime()
-		model.Parameters = params
-		model.Settings = settings
-		model.initBoards()
-		model.initDataSamples()
-		if err := model.save_json(); err != nil {
-			panic(err)
-		}
-
-		// TODO cmdln_flags should be inside model's settings
-		var diffusion_num int = diffusionIterPerGeneration(model.Parameters.D, model.Parameters.BoardSize)
-		fmt.Println("diffusion_num: ", diffusion_num)
-		fmt.Println("model.Parameters.Generations = ", model.Parameters.Generations)
-		fmt.Println("model.Generation_i = ", model.GenerationIdx)
-		for model.GenerationIdx = 0; model.GenerationIdx < model.Parameters.Generations; model.GenerationIdx++ {
-			model.sample()
-			time_per_iter := time.Now()
-			for competition_i := 0; competition_i < model.Parameters.BoardSize*model.Parameters.BoardSize; competition_i++ {
-				model.Competition()
-			}
-
-			for diffusion_i := 0; diffusion_i < diffusion_num; diffusion_i++ {
-				if rand.Intn(2) == 0 {
-					model.Diffuse(Coordinate{r: rand.Intn(model.Parameters.BoardSize),
-						c: rand.Intn(model.Parameters.BoardSize)},
-						true)
-				} else {
-					model.Diffuse(Coordinate{r: rand.Intn(model.Parameters.BoardSize),
-						c: rand.Intn(model.Parameters.BoardSize)},
-						false)
-				}
-			}
-
-			if model.GenerationIdx%10 == 0 {
-				model.showtiming(tstart, time.Since(time_per_iter))
-			}
-		}
+	// TODO cmdln_flags should be inside model's settings
+	var diffusion_num int = diffusionIterPerGeneration(model.Parameters.D, model.Parameters.BoardSize)
+	fmt.Println("diffusion_num: ", diffusion_num)
+	fmt.Println("model.Parameters.Generations = ", model.Parameters.Generations)
+	fmt.Println("model.Generation_i = ", model.GenerationIdx)
+	for model.GenerationIdx = 0; model.GenerationIdx < model.Parameters.Generations; model.GenerationIdx++ {
+		// sample before passing of a generation.
 		model.sample()
-		if err := model.save_json(); err != nil {
-			panic(err)
+		time_per_iter := time.Now()
+		for competition_i := 0; competition_i < model.Parameters.BoardSize*model.Parameters.BoardSize; competition_i++ {
+			model.Competition()
 		}
-		if cmdln_flags.Imagesflag {
-			model.SaveSnapshotsAsImages()
+
+		for diffusion_i := 0; diffusion_i < diffusion_num; diffusion_i++ {
+			if rand.Intn(2) == 0 {
+				model.Diffuse(Coordinate{r: rand.Intn(model.Parameters.BoardSize),
+					c: rand.Intn(model.Parameters.BoardSize)},
+					true)
+			} else {
+				model.Diffuse(Coordinate{r: rand.Intn(model.Parameters.BoardSize),
+					c: rand.Intn(model.Parameters.BoardSize)},
+					false)
+			}
+		}
+
+		if model.GenerationIdx%10 == 0 {
+			model.showtiming(tstart, time.Since(time_per_iter))
 		}
 	}
-
+	model.sample()
+	if err := model.save_json(); err != nil {
+		panic(err)
+	}
 }
 
 func diffusionIterPerGeneration(d float64, boardSize int) int {
