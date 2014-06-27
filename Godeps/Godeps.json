@@ -1,0 +1,14 @@
+{
+	"ImportPath": "gitlab.com/yuvallanger/strife-golang",
+	"GoVersion": "go1.2.1",
+	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/gcfg",
+			"Rev": "c2d3050044d05357eaf6c3547249ba57c5e235cb"
+		},
+		{
+			"ImportPath": "gitlab.com/yuvallanger/miscow",
+			"Rev": "8fcebb5f50dc6749bfc17a5e0d0b8a3fe2a87505"
+		}
+	]
+}
