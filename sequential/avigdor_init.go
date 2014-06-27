@@ -4,7 +4,7 @@ import (
 	"math/rand"
 )
 
-func (model *AvigdorModel) initBoardStrain() {
+func (model *Model) initBoardStrain() {
 	// init on the metal
 	model.BoardStrain = make([][]int, model.Parameters.BoardSize)
 	for row_i := range model.BoardStrain {
@@ -26,7 +26,7 @@ func (model *AvigdorModel) initBoardStrain() {
 	}
 }
 
-func (model *AvigdorModel) initBoardProd() {
+func (model *Model) initBoardProd() {
 	// init on the metal
 	model.BoardProd = make([][]bool, model.Parameters.BoardSize)
 	for i0 := range model.BoardProd {
@@ -46,7 +46,7 @@ func (model *AvigdorModel) initBoardProd() {
 	}
 }
 
-func (model *AvigdorModel) initBoardPGNum() {
+func (model *Model) initBoardPGNum() {
 	model.BoardPGNum = make([][]int, model.Parameters.BoardSize)
 	for row_i := range model.BoardPGNum {
 		model.BoardPGNum[row_i] = make([]int, model.Parameters.BoardSize)
@@ -68,7 +68,7 @@ func (model *AvigdorModel) initBoardPGNum() {
 	}
 }
 
-func (model *AvigdorModel) initBoards() {
+func (model *Model) initBoards() {
 	model.initBoardStrain()
 	model.InitBoardSignalNum()
 	model.initBoardProd()

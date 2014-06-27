@@ -59,7 +59,7 @@ func Main(cmdln_flags flags.Flags) {
 
 	// Which simulation model do we want to run?
 	// Decided according to commandline flags.
-	model := new(AvigdorModel)
+	model := new(Model)
 	model.GitCommitHash = string(gitcommithash)
 	model.CommandlineFlags = cmdln_flags
 	model.setStartTime()

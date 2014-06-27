@@ -51,14 +51,6 @@ func (model *Model) setStartTime() {
 	model.StartTime = int64(time.Now().UnixNano())
 }
 
-type AvigdorModel struct {
-	Model
-}
-
-type CzaranModel struct {
-	Model
-}
-
 type Model struct {
 	CommandlineFlags flags.Flags
 	Parameters       Parameters

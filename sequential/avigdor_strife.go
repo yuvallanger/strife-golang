@@ -5,7 +5,7 @@ import (
 )
 
 // Computes the Avigdor fitness of a cell at a given Coordinate
-func (model *AvigdorModel) Fitness(coord Coordinate) float64 {
+func (model *Model) Fitness(coord Coordinate) float64 {
 	var cost float64 = model.Parameters.BasalCost
 
 	coordToroid := coord.ToroidCoordinates(model.Parameters.BoardSize)
@@ -25,7 +25,7 @@ func (model *AvigdorModel) Fitness(coord Coordinate) float64 {
 }
 
 // Mutate the provided strain
-func (model *AvigdorModel) Mutate(strain int) int {
+func (model *Model) Mutate(strain int) int {
 	r := r4strain[strain]
 	if rand.Float64() < model.Parameters.MutOddsR {
 		r = 1 - r
@@ -40,7 +40,7 @@ func (model *AvigdorModel) Mutate(strain int) int {
 	return StrainSpec(r, s, 1)
 }
 
-func (model *AvigdorModel) UpdateArrays(coord Coordinate, newstrain, oldstrain int) {
+func (model *Model) UpdateArrays(coord Coordinate, newstrain, oldstrain int) {
 	var (
 		neighborStrain                int
 		signalCoord, signalCoordTorus Coordinate
@@ -89,7 +89,7 @@ func (model *AvigdorModel) UpdateArrays(coord Coordinate, newstrain, oldstrain i
 Endgame() copies the winning cell into the losing one's position.
 Before the winning cell is copied, we mutate it using Mutate().
 */
-func (model *AvigdorModel) Endgame(winnerCoord, loserCoord Coordinate) {
+func (model *Model) Endgame(winnerCoord, loserCoord Coordinate) {
 	newstrain := model.Mutate(model.CellStrain(winnerCoord))
 	oldstrain := model.CellStrain(loserCoord)
 	if newstrain != oldstrain {
@@ -102,7 +102,7 @@ func (model *AvigdorModel) Endgame(winnerCoord, loserCoord Coordinate) {
 Competition() takes two adjacent cells, decides who wins, copies the winner,
     mutates it and replaces the losing cell with the mutated copy.
 */
-func (model *AvigdorModel) Competition() {
+func (model *Model) Competition() {
 
 	var c1, c2 Coordinate
 	c1 = RandCoord(model.Parameters.BoardSize)
@@ -133,7 +133,7 @@ Rotate four (2x2) cells 90 degrees.
 
 Cells rotate clockwise if "direction" is true and anticlockwise if "direction" is false.
 */
-func (model *AvigdorModel) Diffuse(coord00 Coordinate, direction bool) {
+func (model *Model) Diffuse(coord00 Coordinate, direction bool) {
 	coordinates, before, after := model.Rotate90(coord00, direction)
 
 	model.UpdateArrays(coordinates[0][0], after[0][0], before[0][0])
